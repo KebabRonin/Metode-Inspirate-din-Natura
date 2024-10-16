@@ -44,14 +44,40 @@ def get_random_bitstring(n) -> bool:
 # 200 < 256 = 2**8 -> 8 biti
 # x - 5*8 biti solutie
 
+# La grafice scara logaritmica pentru solutii, linear pt timp
+# HC ar trebui in < 36 optim la Rastigin (nu cred ca am auzit asta bine: 30 - 40 iters sa ajunga la un optim)
+# t = 40-50s pt 30 dimensiuni 100 iters (am belito)
+# fitness (max(E) - e [nu 1 - e]) / (max(E) - min(E) + eps[\varepsilon in latex])
+# mutatie = 1 / nr_gene_in_solutie (gen 5*8 de mai sus)
+# operatori genetici care ajuta la explorarea spatiului (putem sa ii oferim intuitie) - operatii geometrice(rotatie, translatie, etc) pt probleme de geometrie
+# ## Hibridizari
+# 1. Run GA -> sol prin Sim Annealing ( worst option )
+# 2. Hillclimber -> GA (idk)
+# 3. Run last generation through SA
+# 4. Algo mememic (toata pop prin SA, every time all the time) - v slow (-100x) - mutatie mai mare corecteaza rezultatul (?)
+#   * Variant: Eval chromosome based on SA, but don't update the chromosome (use SA just for Fitness calculation)
+#     * -> indivizii nu sunt capturati de optime locale, ci sunt evaluati prin 'potentialul' lor
+# [mutation -> xover -> HC -> selection] -> HC
+# HC with timeout for use in hibridisation
+# xover 30% 40% creste timpul de rulare, rezultatele nu prea
+# ### Presiunea de selectie
+# * higher - exploitation (mutation)
+# * lower - exploration (xover)
+# fitness in [0,1), augument by (fitness + 1) ^ 2 [same idea as MSE, fitness gets better exponentially -> higher selection pressure]
+# eps greedy gen pt scheduling pressure
+# Soft greedy: 5% din best sunt dusi automat in generatia noua 
+
 def infer_value_space(func_obj, precision, input_dims):
 	b_min = func_obj['bounds'][0]
 	b_max = func_obj['bounds'][1]
 	n = (b_max - b_min) * (10 ** precision)
 	bitstring_len = math.ceil(math.log2(n))
 	sol_len = input_dims * bitstring_len
+	pow2 = (2 ** bitstring_len) - 1
+	interval = (b_max - b_min)
+	# Cache 2 ** n
 	def decode(bitstring):
-		return b_min + (decimal(bitstring) * (b_max - b_min) / (2 ** bitstring_len - 1))
+		return b_min + (decimal(bitstring) * interval / (pow2))
 	return {'sol_len':sol_len, 'bitstring_len': bitstring_len, 'decode': decode}
 
 def neighbourhood(vc: np.ndarray):
@@ -62,20 +88,24 @@ def neighbourhood(vc: np.ndarray):
 		ns.append(new_vc)
 	return ns
 
-def improve(vc, func, neighbours):
-	best_neighbor = vc
+def improve(vc, func):
+	best_neighbor = None
 	best_score = func(vc)
 
-	for neighbour in neighbours:
-		neighbour_score = func(neighbour)
+	for i in range(len(vc)):
+		vc[i] = not(vc[i])
+		neighbour_score = func(vc)
 		if neighbour_score < best_score:
-			best_neighbor = neighbour
+			best_neighbor = i
 			best_score = neighbour_score
 		elif random.random() < 0.01:
-			best_neighbor = neighbour
+			best_neighbor = i
 			best_score = neighbour_score
-
-	return best_neighbor
+		vc[i] = not(vc[i])
+		
+	if best_neighbor:
+		vc[best_neighbor] = not(vc[best_neighbor])
+	return vc
 
 
 def hill_climbing(func_obj, n_dim, precision, max_iter):
@@ -94,7 +124,7 @@ def hill_climbing(func_obj, n_dim, precision, max_iter):
 		vc_score = apply_eval(vc)
 
 		while not local:
-			vn = improve(vc, apply_eval, neighbourhood(vc))
+			vn = improve(vc, apply_eval)
 			vn_score = apply_eval(vn)
 
 			if vn_score < vc_score:
@@ -113,8 +143,8 @@ def hill_climbing(func_obj, n_dim, precision, max_iter):
 	return best, best_score
 
 
-n_dim = 5
-max_iter = 150
+n_dim = 30
+max_iter = 100
 print(f"{n_dim=} {max_iter=}")
 for k in functions.FUNCTIONS.keys():
 	func_obj = functions.FUNCTIONS[k]
