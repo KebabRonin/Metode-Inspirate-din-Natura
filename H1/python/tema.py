@@ -17,8 +17,12 @@ repeat
 until t = MAX
 """
 
+import math
+import random
+import tqdm
+
 import numpy as np
-import math, random, tqdm
+
 import functions
 
 
@@ -30,14 +34,16 @@ import functions
 # 0010
 
 def decimal(bitstring: np.ndarray):
-	l = len(bitstring)
-	return sum([int(bitstring[l - 1 - i]) * 2**i for i in range(l)])
+    l = len(bitstring)
+    return sum([int(bitstring[l - 1 - i]) * 2 ** i for i in range(l)])
+
 
 # def decode(bitstring, b_min, b_max, n):
 # 	return b_min + (decimal(bitstring) * (b_max - b_min) / (2 ** n - 1))
 
 def get_random_bitstring(n) -> bool:
-	return np.array([random.choice([True, False]) for i in range(n)])
+    return np.array([random.choice([True, False]) for i in range(n)])
+
 
 # [-10, 10] -> 200 intervale
 # [-10.0, -9.9, .. 9.9, 10.0] - 200 vals
@@ -68,90 +74,93 @@ def get_random_bitstring(n) -> bool:
 # Soft greedy: 5% din best sunt dusi automat in generatia noua 
 
 def infer_value_space(func_obj, precision, input_dims):
-	b_min = func_obj['bounds'][0]
-	b_max = func_obj['bounds'][1]
-	n = (b_max - b_min) * (10 ** precision)
-	bitstring_len = math.ceil(math.log2(n))
-	sol_len = input_dims * bitstring_len
-	pow2 = (2 ** bitstring_len) - 1
-	interval = (b_max - b_min)
-	# Cache 2 ** n
-	def decode(bitstring):
-		return b_min + (decimal(bitstring) * interval / (pow2))
-	return {'sol_len':sol_len, 'bitstring_len': bitstring_len, 'decode': decode}
+    b_min = func_obj['bounds'][0]
+    b_max = func_obj['bounds'][1]
+    n = (b_max - b_min) * (10 ** precision)
+    bitstring_len = math.ceil(math.log2(n))
+    sol_len = input_dims * bitstring_len
+    pow2 = (2 ** bitstring_len) - 1
+    interval = (b_max - b_min)
+
+    # Cache 2 ** n
+    def decode(bitstring):
+        return b_min + (decimal(bitstring) * interval / (pow2))
+
+    return {'sol_len': sol_len, 'bitstring_len': bitstring_len, 'decode': decode}
+
 
 def neighbourhood(vc: np.ndarray):
-	ns = []
-	for i in range(len(vc)):
-		new_vc = vc.copy()
-		new_vc[i] = not(new_vc[i])
-		ns.append(new_vc)
-	return ns
+    ns = []
+    for i in range(len(vc)):
+        new_vc = vc.copy()
+        new_vc[i] = not (new_vc[i])
+        ns.append(new_vc)
+    return ns
+
 
 def improve(vc, func):
-	best_neighbor = None
-	best_score = func(vc)
+    best_neighbor = None
+    best_score = func(vc)
 
-	for i in range(len(vc)):
-		vc[i] = not(vc[i])
-		neighbour_score = func(vc)
-		if neighbour_score < best_score:
-			best_neighbor = i
-			best_score = neighbour_score
-		elif random.random() < 0.01:
-			best_neighbor = i
-			best_score = neighbour_score
-		vc[i] = not(vc[i])
-		
-	if best_neighbor:
-		vc[best_neighbor] = not(vc[best_neighbor])
-	return vc
+    for i in range(len(vc)):
+        vc[i] = not (vc[i])
+        neighbour_score = func(vc)
+        if neighbour_score < best_score:
+            best_neighbor = i
+            best_score = neighbour_score
+        elif random.random() < 0.01:
+            best_neighbor = i
+            best_score = neighbour_score
+        vc[i] = not (vc[i])
+
+    if best_neighbor:
+        vc[best_neighbor] = not (vc[best_neighbor])
+    return vc
 
 
 def hill_climbing(func_obj, n_dim, precision, max_iter):
-	func = func_obj['f']
-	problem_repr = infer_value_space(func_obj, precision, n_dim)
+    func = func_obj['f']
+    problem_repr = infer_value_space(func_obj, precision, n_dim)
 
-	best = get_random_bitstring(problem_repr['sol_len'])
-	best_score = func(best)
+    best = get_random_bitstring(problem_repr['sol_len'])
+    best_score = func(best)
 
-	def apply_eval(x):
-		return func(np.array([problem_repr['decode'](x[i*problem_repr['bitstring_len']:(i+1)*problem_repr['bitstring_len']]) for i in range(n_dim)]))
+    def apply_eval(x):
+        return func(np.array(
+            [problem_repr['decode'](x[i * problem_repr['bitstring_len']:(i + 1) * problem_repr['bitstring_len']]) for i
+             in range(n_dim)]))
 
-	for t in tqdm.trange(max_iter):
-		local = False
-		vc = get_random_bitstring(problem_repr['sol_len'])
-		vc_score = apply_eval(vc)
+    for t in tqdm.trange(max_iter):
+        local = False
+        vc = get_random_bitstring(problem_repr['sol_len'])
+        vc_score = apply_eval(vc)
 
-		while not local:
-			vn = improve(vc, apply_eval)
-			vn_score = apply_eval(vn)
+        while not local:
+            vn = improve(vc, apply_eval)
+            vn_score = apply_eval(vn)
 
-			if vn_score < vc_score:
-				vc = vn
-				vc_score = vn_score
-			else:
-				local = True
+            if vn_score < vc_score:
+                vc = vn
+                vc_score = vn_score
+            else:
+                local = True
 
-		# print(f"Iter {t}: curr stop: {x} curr score {vc_score}")
+        # print(f"Iter {t}: curr stop: {x} curr score {vc_score}")
 
-		if vc_score < best_score:
-			best = vc
-			best_score = vc_score
+        if vc_score < best_score:
+            best = vc
+            best_score = vc_score
 
-	best = np.array([problem_repr['decode'](best[i*problem_repr['bitstring_len']:(i+1)*problem_repr['bitstring_len']]) for i in range(n_dim)])
-	return best, best_score
+    best = np.array(
+        [problem_repr['decode'](best[i * problem_repr['bitstring_len']:(i + 1) * problem_repr['bitstring_len']]) for i
+         in range(n_dim)])
+    return best, best_score
 
 
 n_dim = 30
 max_iter = 100
 print(f"{n_dim=} {max_iter=}")
 for k in functions.FUNCTIONS.keys():
-	func_obj = functions.FUNCTIONS[k]
-	best_solution, best_score = hill_climbing(
-		func_obj,
-		n_dim,
-		precision=5,
-		max_iter=max_iter
-	)
-	print(k, best_score, best_solution)
+    func_obj = functions.FUNCTIONS[k]
+    best_solution, best_score = hill_climbing(func_obj, n_dim, precision=5, max_iter=max_iter)
+    print(k, best_score, best_solution)
