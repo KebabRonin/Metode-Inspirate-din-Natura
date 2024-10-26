@@ -95,9 +95,9 @@ def ag(problem_repr: dict, pop_size: int, fitness_func, selection_method, mutati
     best_solution = candidate
     for _ in tqdm.trange(100):
         population = selection_method(population, fitness_pop, pop_size//2)
-        #population = [mutate(individual, mutation_rate) for individual in population]
-        population = crossover_population(population, crossover_rate)
         population = [mutate(individual, mutation_rate) for individual in population]
+        population = crossover_population(population, crossover_rate)
+        #population = [mutate(individual, mutation_rate) for individual in population]
         fitness_pop = evaluate_population(population, fitness_func, problem_repr)
         candidate = sorted(list(zip(population, fitness_pop)), key=lambda x: x[1])[0]
         if candidate[1] < best_solution[1]:
@@ -110,7 +110,7 @@ def main(f):
     func_obj = functions.FUNCTIONS[f]
     pop_size = 500
     precision = 5
-    input_dims = 100
+    input_dims = 5
     problem_repr = infer_value_space(func_obj, precision, input_dims)
     fitness_func = func_obj['f']
     selection_method = selection
