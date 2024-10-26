@@ -111,8 +111,8 @@ def hill_climbing(func_obj, n_dim: int, precision: int, max_iter: int):
 
 
 # Parameters
-n_dim = 30
-max_iter = 200
+n_dim = 100
+max_iter = 300
 precision = 5  # Precision of the interval division
 print(f"Running Hill Climbing: {n_dim=}, {max_iter=}, {precision=}")
 
