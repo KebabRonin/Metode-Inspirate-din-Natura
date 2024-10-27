@@ -1,3 +1,6 @@
+#ifndef FUNCTIONS_H
+#define FUNCTIONS_H
+
 #include <iostream>
 #include <cmath>
 #include <vector>
@@ -9,7 +12,7 @@
 
 const double PI = 3.14159265358979323846;
 
-class ProblemSpec;
+struct ProblemSpec;
 
 class OptimizationFunction {
 public:
@@ -120,7 +123,7 @@ public:
 };
 
 
-OptimizationFunction* FUNCTIONS[] = {
+static const OptimizationFunction* FUNCTIONS[] = {
 	new Michalewicz(),
 	new Rastrigin(),
 	new Griewangk(),
@@ -128,6 +131,7 @@ OptimizationFunction* FUNCTIONS[] = {
 	new DeJong()
 };
 
+#endif
 // int main() {
 // 	ParameterList test_vec1 = {0, 0};
 // 	ParameterList test_vec2 = {2.2, 1.57};
