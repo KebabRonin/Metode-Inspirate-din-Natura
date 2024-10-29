@@ -1,5 +1,4 @@
-#ifndef PROBLEM_SPEC_H
-#define PROBLEM_SPEC_H
+#pragma once
 
 #include <iostream>
 #include <cmath>
@@ -9,7 +8,7 @@
 #include <random>
 #include <chrono>
 #include <algorithm>
-#include "functions.cpp"
+#include "Functions.hpp"
 
 struct ProblemSpec {
 	const OptimizationFunction& f;
@@ -74,5 +73,3 @@ double OptimizationFunction::apply(const Bitstring& vc, const ProblemSpec& probl
 double OptimizationFunction::compute(const Bitstring& vc, const ProblemSpec& problem) const {
 	return compute(problem.decodeSolution(vc));
 }
-
-#endif

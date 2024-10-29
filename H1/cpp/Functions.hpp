@@ -1,16 +1,12 @@
-#ifndef FUNCTIONS_H
-#define FUNCTIONS_H
+#pragma once
+
+#include "Utils.hpp"
 
 #include <iostream>
 #include <cmath>
 #include <vector>
 #include <stdexcept>
 #include <string>
-
-#define Bitstring std::vector<bool>
-#define ParameterList std::vector<double>
-
-const double PI = 3.14159265358979323846;
 
 struct ProblemSpec;
 
@@ -127,28 +123,6 @@ static const OptimizationFunction* FUNCTIONS[] = {
 	new Michalewicz(),
 	new Rastrigin(),
 	new Griewangk(),
-	new Rosenbrock(),
-	new DeJong()
+	new Rosenbrock()
+	// ,new DeJong()
 };
-
-#endif
-// int main() {
-// 	ParameterList test_vec1 = {0, 0};
-// 	ParameterList test_vec2 = {2.2, 1.57};
-// 	ParameterList test_vec3 = {1, 1};
-
-// 	ParameterList* current_vec;
-
-// 	for (const auto& func : FUNCTIONS) {
-// 		if (func->name() == "Michalewicz") {
-// 			current_vec = &test_vec2;
-// 		} else if (func->name() == "Rosenbrock") {
-// 			current_vec = &test_vec3;
-// 		} else {
-// 			current_vec = &test_vec1;
-// 		}
-// 		std::cout << func->name() << " (test run): " << func->apply(*current_vec) << std::endl;
-// 	}
-
-// 	return 0;
-// }
