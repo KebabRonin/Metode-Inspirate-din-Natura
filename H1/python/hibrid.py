@@ -109,7 +109,7 @@ def crossover(parent1: list, parent2: list) -> tuple[list, list]:
 
 def crossover_population(population: list) -> list:
     # Shuffle the population, pair up individuals and apply crossover with append
-    #random.shuffle(population)
+    random.shuffle(population)
     for i in range(0, len(population), 2):
         child1, child2 = crossover(population[i], population[i + 1])
         population.append(child1)
@@ -126,9 +126,32 @@ def mutate(individual: list, mutation_rate: float) -> list:
     return individual
 
 
-def selection(population: list, fitness: list, n: int) -> list:
+def tournament_selection(population: list, fitness: list, n: int) -> list:
+    # Select the best n individuals based on their fitness
+    selected = []
+    for _ in range(n):
+        idx1 = random.randint(0, len(population) - 1)
+        idx2 = random.randint(0, len(population) - 1)
+        selected.append(population[idx1] if fitness[idx1] < fitness[idx2] and random.random() < 0.8 else population[idx2])
+
+    return selected
+
+
+def elitism_selection(population: list, fitness: list, n: int) -> list:
     # Select the best n individuals based on their fitness
     return sort_population_by_fitness(population, fitness)[:n]
+
+
+def mixed_selection(population: list, fitness: list, n: int) -> list:
+    # Select the best 10% of the population using elitisim selection and the rest using tournament selection
+    n_elitism = n // 10
+    n_tournament = n - n_elitism
+    selected = elitism_selection(population, fitness, n_elitism)
+    selected += tournament_selection(
+        list(filter(lambda x: x in selected, population)),
+        fitness, n_tournament
+    )
+    return selected
 
 
 def ag(problem_repr: dict, pop_size: int, fitness_func, selection_method):
@@ -139,9 +162,8 @@ def ag(problem_repr: dict, pop_size: int, fitness_func, selection_method):
     best_solution = candidate
     for t in tqdm.trange(100, desc="AG generations", position=0):
         population = selection_method(population, fitness_pop, pop_size // 2)
-        population = [mutate(individual, mutation_rate) for individual in population]
         population = crossover_population(population)
-        # population = [mutate(individual, mutation_rate) for individual in population]
+        population = [mutate(individual, mutation_rate) for individual in population]
         fitness_pop = evaluate_population(population, fitness_func, problem_repr)
         candidate = sorted(list(zip(population, fitness_pop)), key=lambda x: x[1])[0]
         if candidate[1] < best_solution[1]:
@@ -158,10 +180,10 @@ def main(f):
     func_obj = functions.FUNCTIONS[f]
     pop_size = 50
     precision = 5
-    input_dims = 30
+    input_dims = 5
     problem_repr = infer_value_space(func_obj, precision, input_dims)
     fitness_func = func_obj['f']
-    selection_method = selection
+    selection_method = elitism_selection
 
     pop, best = ag(problem_repr, pop_size, fitness_func, selection_method)
 

@@ -41,8 +41,6 @@ std::pair<ParameterList, double> hillClimbing(const OptimizationFunction& f, con
 	auto pbar = tq::trange(0, max_iter);
 	pbar.set_prefix(problem.f.name());
 
-	// Eu ma duc sa mananc
-
 	for (int t : pbar) {
 		Bitstring vc = problem.randomBitstring();
 		double vc_score = f.compute(vc, problem);
