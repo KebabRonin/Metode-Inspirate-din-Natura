@@ -51,7 +51,10 @@ if __name__ == '__main__':
     print("Michalewicz (expected -1.8013): ", Michalewicz([2.2, 1.57]))
     print("Rosenbrock (expected 0): ", Rosenbrock([1.0, 1.0]))
 
-FUNCTIONS = {"DeJong": {"f": DeJong, "bounds": (-5.12, 5.12)}, "Rastrigin": {"f": Rastrigin, "bounds": (-5.12, 5.12)},
-             "Griewangk": {"f": Griewangk, "bounds": (-600, 600)},
-             "Michalewicz": {"f": Michalewicz, "bounds": (0, math.pi)},
-             "Rosenbrock": {"f": Rosenbrock, "bounds": (-2.048, 2.048)}, }
+FUNCTIONS = {
+    "Griewangk": {"f": Griewangk, "bounds": (-600, 600)},
+    "Michalewicz": {"f": Michalewicz, "bounds": (0, math.pi)},
+    "Rosenbrock": {"f": Rosenbrock, "bounds": (-2.048, 2.048)},
+    "DeJong": {"f": DeJong, "bounds": (-5.12, 5.12)},
+    "Rastrigin": {"f": Rastrigin, "bounds": (-5.12, 5.12)},
+}

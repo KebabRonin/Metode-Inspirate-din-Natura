@@ -1,21 +1,4 @@
-"""
-t := 0
-initialize best
-repeat
-	local := FALSE
-	select a candidate solution (bitstring) vc at random
-	evaluate vc
-	repeat
-		vn := Improve(Neghborhood(vc))
- 	if eval(vn) is better than eval(vc)
-	then vc := vn
-	else local := TRUE
-	until local
-	t := t + 1
-	if vc is better than best
-	then best := vc
-until t = MAX
-"""
+
 
 import math
 import random

@@ -26,15 +26,6 @@ def infer_value_space(func_obj, precision: int, input_dims: int):
     return {'sol_len': sol_len, 'n_bits': n_bits, 'b_min': b_min, 'b_max': b_max}
 
 
-def neighbourhood(vc: list) -> list:
-    neighbors = []
-    for i in range(len(vc)):
-        neighbor = vc.copy()
-        neighbor[i] = 1 - neighbor[i]
-        neighbors.append(neighbor)
-    return neighbors
-
-
 def improve(vc: list, func):
     best_neighbor = None
     best_score = func(vc)
@@ -96,8 +87,8 @@ def hill_climbing(func_obj, n_dim: int, precision: int, max_iter: int):
     return best_decoded, best_score
 
 
-n_dim = 5
-max_iter = 100
+n_dim = 100
+max_iter = 200
 precision = 5
 print(f"Running Hill Climbing: {n_dim=}, {max_iter=}, {precision=}")
 

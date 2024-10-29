@@ -1,6 +1,7 @@
 import math
 import random
 
+import copy
 import tqdm
 
 import functions
@@ -41,13 +42,57 @@ def generate_starting_population(pop_size: int, sol_len: int) -> list:
     return [get_random_bitstring(sol_len) for _ in range(pop_size)]
 
 
+def improve(vc: list, func):
+    best_neighbor = None
+    best_score = func(vc)
+
+    for i in range(len(vc)):
+        vc[i] = 1 - vc[i]
+        neighbor_score = func(vc)
+        if neighbor_score < best_score:
+            best_neighbor = i
+            best_score = neighbor_score
+
+        vc[i] = 1 - vc[i]
+
+    if best_neighbor is not None:
+        vc[best_neighbor] = 1 - vc[best_neighbor]
+    return vc
+
+
+def hc_individual(individual: list, func, problem_repr):
+    def apply_eval(x: list) -> float:
+        decoded_values = [decode(x[i * problem_repr['n_bits']:(i + 1) * problem_repr['n_bits']], problem_repr['b_min'],
+                                 problem_repr['b_max'], problem_repr['n_bits']) for i in
+            range(problem_repr['sol_len'] // problem_repr['n_bits'])]
+        return func(decoded_values)
+
+    local = False
+    vc = copy.deepcopy(individual)
+    vc_score = apply_eval(vc)
+    counter = 0
+
+    while not local and counter < 5:
+        counter += 1
+
+        vn = improve(vc, apply_eval)
+        vn_score = apply_eval(vn)
+
+        if vn_score < vc_score:
+            vc = vn
+            vc_score = vn_score
+        else:
+            local = True
+    return vc_score, vc
+
+
 def evaluate_population(population: list, func, problem_repr: dict) -> list:
     fitness = []
-
-    for individual in population:
-        decoded = decode_chrom(individual, problem_repr['b_min'], problem_repr['b_max'], problem_repr['n_bits'])
-        rez = func(decoded)
-        fitness.append(rez)
+    for individual in population:  # tqdm.tqdm(population, desc="Eval population (HC)", position=0):
+        fitness_score, _ = hc_individual(individual, func, problem_repr)
+        # decoded = decode_chrom(individual, problem_repr['b_min'], problem_repr['b_max'], problem_repr['n_bits'])
+        # rez = func(decoded)
+        fitness.append(fitness_score)
 
     return fitness
 
@@ -58,7 +103,7 @@ def sort_population_by_fitness(population: list, fitness: list) -> list[list[int
 
 def crossover(parent1: list, parent2: list) -> tuple[list, list]:
     n = len(parent1)
-    c = random.randint(1, n - 1)
+    c = random.randint(1, n-1)
     return parent1[:c] + parent2[c:], parent2[:c] + parent1[c:]
 
 
@@ -92,7 +137,7 @@ def ag(problem_repr: dict, pop_size: int, fitness_func, selection_method):
     fitness_pop = evaluate_population(population, fitness_func, problem_repr)
     candidate = sorted(list(zip(population, fitness_pop)), key=lambda x: x[1])[0]
     best_solution = candidate
-    for t in tqdm.trange(300, desc="AG generations", position=0):
+    for t in tqdm.trange(100, desc="AG generations", position=0):
         population = selection_method(population, fitness_pop, pop_size // 2)
         population = [mutate(individual, mutation_rate) for individual in population]
         population = crossover_population(population)
@@ -101,14 +146,17 @@ def ag(problem_repr: dict, pop_size: int, fitness_func, selection_method):
         candidate = sorted(list(zip(population, fitness_pop)), key=lambda x: x[1])[0]
         if candidate[1] < best_solution[1]:
             best_solution = candidate
-        mutation_rate *= 0.99
+        mutation_rate *= 0.9
+
+    # run hill climbing on the best solution
+    _, best_solution = hc_individual(best_solution[0], fitness_func, problem_repr)
 
     return population, best_solution
 
 
 def main(f):
     func_obj = functions.FUNCTIONS[f]
-    pop_size = 1000
+    pop_size = 50
     precision = 5
     input_dims = 30
     problem_repr = infer_value_space(func_obj, precision, input_dims)
@@ -117,10 +165,19 @@ def main(f):
 
     pop, best = ag(problem_repr, pop_size, fitness_func, selection_method)
 
-    best = (best[1], decode_chrom(best[0], problem_repr['b_min'], problem_repr['b_max'], problem_repr['n_bits']))
-
-    # print(*sols, sep='\n')
+    best = decode_chrom(best, problem_repr['b_min'], problem_repr['b_max'], problem_repr['n_bits'])
+    best = (fitness_func(best), best)
     print("Best: ", best)
+
+
+"""
+Cat ar trebui sa ruleze (ca timp) fiecare experiment?
+Cat de aproape de rezultat trebuie sa fie?
+Valorile pt parametri? sugestii?
+Ar trebui schimbati parametri in functie de experiment (-600 600 vs -2 2)?
+raport ? Cat de lung, ce sa contina, capitole, structura, 
+  cat de detaliat (a cata iteratie optim, sau doar cat a rulat?)
+"""
 
 
 if __name__ == '__main__':
