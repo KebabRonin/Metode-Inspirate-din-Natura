@@ -38,10 +38,7 @@ struct ProblemSpec {
 
 	Bitstring randomBitstring() const {
 		Bitstring bitstring(sol_len);
-		static std::random_device rd;
-		static std::mt19937 gen(rd());
-		static std::uniform_int_distribution<> dis(0, 1);
-		std::generate(bitstring.begin(), bitstring.end(), [&]() { return dis(gen); });
+		std::generate(bitstring.begin(), bitstring.end(), [&]() { return rand_binary(rng_generator); });
 		return bitstring;
 	}
 
