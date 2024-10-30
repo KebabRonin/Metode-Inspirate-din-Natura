@@ -35,11 +35,11 @@ void improve(Bitstring& vc, const ProblemSpec& problem) {
 }
 
 
-std::pair<Bitstring&, double> hillClimbing(Bitstring& vc, const ProblemSpec& problem) {
+std::pair<Bitstring&, double> hillClimbing(Bitstring& vc, const ProblemSpec& problem, int max_iter=1e9) {
 	double vc_score = problem.getFitness(vc);
 	bool local = false;
 
-	while (!local) {
+	while (!local && max_iter--) {
 		improve(vc, problem); // vc is modified here if a better neighbour is found.
 		double vn_score = problem.getFitness(vc);
 
@@ -66,7 +66,7 @@ std::pair<ParameterList, double> iteratedHillClimbing(const int max_iter, const 
 
 	for (int t : pbar) {
 		Bitstring vc = problem.randomBitstring();
-		
+
 		auto [vn, vn_score] = hillClimbing(vc, problem);
 
 		if (vn_score < best_score) {
@@ -78,3 +78,20 @@ std::pair<ParameterList, double> iteratedHillClimbing(const int max_iter, const 
 	ParameterList best_decoded = problem.decodeSolution(best);
 	return {best_decoded, best_score};
 }
+
+
+// class HCIterated : public OptimizationFunction {
+// public:
+// 	const OptimizationFunction& f;
+// 	HCIterated(const OptimizationFunction& f) : f(f) {}
+// 	double compute(const ParameterList& x) const override {
+// 		return f.compute(x);
+// 	}
+// 	double compute(const Bitstring& vc, const ProblemSpec& problem) const override {
+// 		Bitstring bitstring = vc;
+// 		ProblemSpec noHCProblem(this->f, problem.precision, problem.input_dims);
+// 		return hillClimbing(bitstring, noHCProblem).second;
+// 	}
+// 	std::pair<double, double> bounds() const override { return {0, 1}; }
+// 	std::string name() const override { return "HCIterated"; }
+// };

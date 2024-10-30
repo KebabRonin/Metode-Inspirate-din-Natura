@@ -72,9 +72,6 @@ struct ProblemSpec {
 	}
 };
 
-double OptimizationFunction::apply(const Bitstring& vc, const ProblemSpec& problem) const {
-	return apply(problem.decodeSolution(vc));
-}
 double OptimizationFunction::compute(const Bitstring& vc, const ProblemSpec& problem) const {
 	return compute(problem.decodeSolution(vc));
 }

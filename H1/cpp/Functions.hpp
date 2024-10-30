@@ -31,13 +31,11 @@ public:
 		}
 		return compute(x);
 	}
-	double apply(const Bitstring& x, const ProblemSpec& problem) const;
-	double compute(const Bitstring& x, const ProblemSpec& problem) const;
+	virtual double compute(const Bitstring& x, const ProblemSpec& problem) const;
 	virtual double compute(const ParameterList& x) const = 0;
 	virtual std::pair<double, double> bounds() const = 0;
 	virtual std::string name() const = 0;
 };
-
 
 class Michalewicz : public OptimizationFunction {
 public:

@@ -3,19 +3,20 @@
 #include <iostream>
 #include <vector>
 #include <random>
-
-#define Bitstring std::vector<bool>
-#define ParameterList std::vector<double>
+#include "tqdm.hpp"
+// General types
+typedef std::vector<bool> Bitstring;
+typedef std::vector<double> ParameterList;
 
 const double PI = 3.14159265358979323846;
 
 template < class T >
-std::ostream& operator << (std::ostream& os, const std::vector<T>& v) 
+std::ostream& operator << (std::ostream& os, const std::vector<T>& v)
 {
     os << "[ ";
     for (auto i : v)
     {
-        os << i << " ";
+        os << i << ", ";
     }
     os << "]";
     return os;
