@@ -25,7 +25,7 @@ void runHC(int n_dim, int max_iter, int precision)
 
 		// Actual code
 		ProblemSpec problem(*func_obj, precision, n_dim);
-		auto [best_solution, best_score] = iteratedHillClimbing(*func_obj, problem, max_iter);
+		auto [best_solution, best_score] = iteratedHillClimbing(max_iter, problem);
 
 		// Printing
 		auto end = std::chrono::high_resolution_clock::now();

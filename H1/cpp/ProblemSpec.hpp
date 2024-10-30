@@ -45,6 +45,14 @@ struct ProblemSpec {
 		return bitstring;
 	}
 
+	inline double getFitness(const Bitstring& bitstring) const {
+		return f.compute(bitstring, *this);
+	}
+
+	inline double getFitness(const ParameterList& params) const {
+		return f.compute(params);
+	}
+
 	double numeric(const Bitstring& segment) const {
 		int bit_value = 0;
 		int power = 1;

@@ -15,13 +15,13 @@
  * Modifies the given bitstring on return.
  */
 void improve(Bitstring& vc, const ProblemSpec& problem) {
-	double best_score = problem.f.compute(vc, problem);
+	double best_score = problem.getFitness(vc);
 	int best_neighbor = -1;
 	int size = vc.size();
 
 	for (int i = 0; i < size; ++i) {
 		vc[i] = !vc[i];
-		double neighbor_score = problem.f.compute(vc, problem);
+		double neighbor_score = problem.getFitness(vc);
 		if (neighbor_score < best_score) {
 			best_score = neighbor_score;
 			best_neighbor = i;
@@ -35,13 +35,13 @@ void improve(Bitstring& vc, const ProblemSpec& problem) {
 }
 
 
-std::pair<Bitstring&, double> hillClimbing(Bitstring& vc, const OptimizationFunction& f, const ProblemSpec& problem) {
-	double vc_score = f.compute(vc, problem);
+std::pair<Bitstring&, double> hillClimbing(Bitstring& vc, const ProblemSpec& problem) {
+	double vc_score = problem.getFitness(vc);
 	bool local = false;
 
 	while (!local) {
 		improve(vc, problem); // vc is modified here if a better neighbour is found.
-		double vn_score = f.compute(vc, problem);
+		double vn_score = problem.getFitness(vc);
 
 		if (vn_score < vc_score) {
 			// vc = vn;
@@ -55,18 +55,19 @@ std::pair<Bitstring&, double> hillClimbing(Bitstring& vc, const OptimizationFunc
 }
 
 
-std::pair<ParameterList, double> iteratedHillClimbing(const OptimizationFunction& f, const ProblemSpec& problem, const int max_iter) {
+std::pair<ParameterList, double> iteratedHillClimbing(const int max_iter, const ProblemSpec& problem) {
+	// Initial guess
 	Bitstring best = problem.randomBitstring();
-	double best_score = f.compute(best, problem);
+	double best_score = problem.getFitness(best);
 
-	// Logging
+	// Logging time taken and progress bar.
 	auto pbar = tq::trange(0, max_iter);
 	pbar.set_prefix(problem.f.name());
 
 	for (int t : pbar) {
 		Bitstring vc = problem.randomBitstring();
 		
-		auto [vn, vn_score] = hillClimbing(vc, f, problem);
+		auto [vn, vn_score] = hillClimbing(vc, problem);
 
 		if (vn_score < best_score) {
 			best = vn;

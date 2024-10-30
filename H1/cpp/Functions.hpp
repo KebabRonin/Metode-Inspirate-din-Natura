@@ -20,6 +20,10 @@ public:
 		}
 		return true;
 	}
+	/**
+	 * Return the value of the function when run with the given parameters.
+	 * Also includes bound checking, so use `compute()` directly for more performance.
+	 */
 	double apply(const ParameterList& x) const {
 		if (!check_bounds(x)) {
 			std::cout << name() << ": x must be in [" << bounds().first << ", " << bounds().second << "]" << std::endl;
