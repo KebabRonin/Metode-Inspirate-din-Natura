@@ -56,7 +56,6 @@ std::pair<Bitstring, Bitstring> crossover(const Bitstring& parent1, const Bitstr
 
 Population crossoverPopulation(const Population& population) {
   Population children;
-  // std::shuffle(population.begin(), population.end(), rng_generator);
   for (int i = 0; i < population.size(); i += 2) {
     int j = i + 1;
     if (j >= population.size()) {

@@ -78,20 +78,3 @@ std::pair<ParameterList, double> iteratedHillClimbing(const int max_iter, const 
 	ParameterList best_decoded = problem.decodeSolution(best);
 	return {best_decoded, best_score};
 }
-
-
-// class HCIterated : public OptimizationFunction {
-// public:
-// 	const OptimizationFunction& f;
-// 	HCIterated(const OptimizationFunction& f) : f(f) {}
-// 	double compute(const ParameterList& x) const override {
-// 		return f.compute(x);
-// 	}
-// 	double compute(const Bitstring& vc, const ProblemSpec& problem) const override {
-// 		Bitstring bitstring = vc;
-// 		ProblemSpec noHCProblem(this->f, problem.precision, problem.input_dims);
-// 		return hillClimbing(bitstring, noHCProblem).second;
-// 	}
-// 	std::pair<double, double> bounds() const override { return {0, 1}; }
-// 	std::string name() const override { return "HCIterated"; }
-// };

@@ -105,26 +105,9 @@ public:
 };
 
 
-class DeJong : public OptimizationFunction {
-public:
-	double compute(const ParameterList& x) const override {
-		int n = x.size();
-		double y = 0.0;
-		for (int i = 0; i < n - 1; ++i) {
-			y += std::pow(x[i], 2);
-		}
-		return y;
-	}
-
-	std::pair<double, double> bounds() const override { return {-5.12, 5.12}; }
-	std::string name() const override { return "DeJong"; }
-};
-
-
 static const OptimizationFunction* FUNCTIONS[] = {
 	new Michalewicz(),
 	new Rastrigin(),
 	new Griewangk(),
 	new Rosenbrock()
-	// ,new DeJong()
 };
