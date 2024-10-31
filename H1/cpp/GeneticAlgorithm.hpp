@@ -56,12 +56,17 @@ std::pair<Bitstring, Bitstring> crossover(const Bitstring& parent1, const Bitstr
 
 Population crossoverPopulation(const Population& population) {
   Population children;
-  for (int i = 0; i < population.size(); i += 2) {
-    int j = i + 1;
-    if (j >= population.size()) {
-      j = i;
+  // Shuffle
+  std::vector<double> randomValues;
+  randomValues.reserve(population.size());
+  std::for_each(population.begin(), population.end(), [&](const Chromosome& _) {randomValues.push_back(rand_real(rng_generator));});
+  std::vector<int> sortedIndexes = sortIndexes(randomValues);
+  for (auto i = sortedIndexes.begin(); i != sortedIndexes.end(); ++i, ++i) {
+    auto j = i + 1;
+    if (j == sortedIndexes.end()) {
+      j = i; // sortedIndexes.begin();
     }
-    auto [child1, child2] = crossover(population[i], population[j]);
+    auto [child1, child2] = crossover(population[*i], population[*j]);
     children.push_back(child1);
     children.push_back(child2);
   }
@@ -145,6 +150,7 @@ ParameterList geneticAlgorithm(int popSize, int generations, float mutationRate,
       bestScore = candidateScore;
       bestSolution = candidateSolution;
     }
+    mutationRate *= 0.999;
   }
   ParameterList best_decoded = problem.decodeSolution(bestSolution);
   return best_decoded;

@@ -41,6 +41,7 @@ ParameterList hybrid(
       bestScore = candidateScore;
       bestSolution = candidateSolution;
     }
+    mutationRate *= 0.999;
   }
   bestSolution = hillClimbing(bestSolution, problem, hcIters).first; // Added this
   ParameterList best_decoded = problem.decodeSolution(bestSolution);
