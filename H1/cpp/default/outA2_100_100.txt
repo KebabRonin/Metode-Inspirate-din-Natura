@@ -1,0 +1,108 @@
+{
+	"algorithm" : {
+		"name" : "Genetic",
+		"pop_size" : 100,
+		"max_generations" : 100,
+		"precision" : 5
+	},
+	"Michalewicz":{
+		"seconds_elapsed" : 0.119185,
+		"best_score" : -1.8013,
+		"best_solution" : [ 2.20289, 1.57079, ]
+		},
+	"Michalewicz":{
+		"seconds_elapsed" : 0.123403,
+		"best_score" : -1.8013,
+		"best_solution" : [ 2.20279, 1.57079, ]
+		},
+	"Michalewicz":{
+		"seconds_elapsed" : 0.123158,
+		"best_score" : -1.8013,
+		"best_solution" : [ 2.20279, 1.57079, ]
+		},
+	"Michalewicz":{
+		"seconds_elapsed" : 0.187216,
+		"best_score" : -1.8013,
+		"best_solution" : [ 2.20279, 1.57079, ]
+		},
+	"Michalewicz":{
+		"seconds_elapsed" : 0.198671,
+		"best_score" : -1.8013,
+		"best_solution" : [ 2.20289, 1.57079, ]
+		},
+	"Rastrigin":{
+		"seconds_elapsed" : 0.150921,
+		"best_score" : 3.78404e-08,
+		"best_solution" : [ 9.76564e-06, -9.76564e-06, ]
+		},
+	"Rastrigin":{
+		"seconds_elapsed" : 0.161361,
+		"best_score" : 3.78404e-08,
+		"best_solution" : [ -9.76564e-06, 9.76564e-06, ]
+		},
+	"Rastrigin":{
+		"seconds_elapsed" : 0.176871,
+		"best_score" : 3.78404e-08,
+		"best_solution" : [ -9.76564e-06, 9.76564e-06, ]
+		},
+	"Rastrigin":{
+		"seconds_elapsed" : 0.154269,
+		"best_score" : 3.78404e-08,
+		"best_solution" : [ 9.76564e-06, 9.76564e-06, ]
+		},
+	"Rastrigin":{
+		"seconds_elapsed" : 0.133172,
+		"best_score" : 3.78404e-08,
+		"best_solution" : [ 9.76564e-06, 9.76564e-06, ]
+		},
+	"Griewangk":{
+		"seconds_elapsed" : 0.171547,
+		"best_score" : 0.0295842,
+		"best_solution" : [ -6.27994, -8.8769, ]
+		},
+	"Griewangk":{
+		"seconds_elapsed" : 0.181351,
+		"best_score" : 0.0228825,
+		"best_solution" : [ 3.14, -4.68751, ]
+		},
+	"Griewangk":{
+		"seconds_elapsed" : 0.168217,
+		"best_score" : 0.0591786,
+		"best_solution" : [ -12.561, -8.87689, ]
+		},
+	"Griewangk":{
+		"seconds_elapsed" : 0.172255,
+		"best_score" : 0.00739615,
+		"best_solution" : [ -3.14029, -4.4379, ]
+		},
+	"Griewangk":{
+		"seconds_elapsed" : 0.170804,
+		"best_score" : 0.0197195,
+		"best_solution" : [ -0.000187755, -8.87655, ]
+		},
+	"Rosenbrock":{
+		"seconds_elapsed" : 0.122208,
+		"best_score" : 0.000788477,
+		"best_solution" : [ 1.02803, 1.05701, ]
+		},
+	"Rosenbrock":{
+		"seconds_elapsed" : 0.116643,
+		"best_score" : 0.0805264,
+		"best_solution" : [ 0.716917, 0.511994, ]
+		},
+	"Rosenbrock":{
+		"seconds_elapsed" : 0.116868,
+		"best_score" : 0.000608695,
+		"best_solution" : [ 1.02464, 1.05001, ]
+		},
+	"Rosenbrock":{
+		"seconds_elapsed" : 0.171479,
+		"best_score" : 0.284496,
+		"best_solution" : [ 1.52197, 2.30541, ]
+		},
+	"Rosenbrock":{
+		"seconds_elapsed" : 0.143116,
+		"best_score" : 0.374764,
+		"best_solution" : [ 1.54886, 2.37184, ]
+		},
+}

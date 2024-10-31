@@ -1,0 +1,7 @@
+{
+	"algorithm" : {
+		"name" : "Hybrid",
+		"pop_size" : 100,
+		"max_generations" : 100,
+		"precision" : 5
+	},

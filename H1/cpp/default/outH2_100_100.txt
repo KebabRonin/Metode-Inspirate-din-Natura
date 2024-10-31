@@ -1,0 +1,108 @@
+{
+	"algorithm" : {
+		"name" : "Hybrid",
+		"pop_size" : 100,
+		"max_generations" : 100,
+		"precision" : 5
+	},
+	"Michalewicz":{
+		"seconds_elapsed" : 7.20427,
+		"best_score" : -1.8013,
+		"best_solution" : [ 2.2029, 1.57079, ]
+		},
+	"Michalewicz":{
+		"seconds_elapsed" : 6.59042,
+		"best_score" : -1.8013,
+		"best_solution" : [ 2.2029, 1.5708, ]
+		},
+	"Michalewicz":{
+		"seconds_elapsed" : 6.66122,
+		"best_score" : -1.8013,
+		"best_solution" : [ 2.2029, 1.5708, ]
+		},
+	"Michalewicz":{
+		"seconds_elapsed" : 6.84823,
+		"best_score" : -1.8013,
+		"best_solution" : [ 2.2029, 1.57079, ]
+		},
+	"Michalewicz":{
+		"seconds_elapsed" : 6.48724,
+		"best_score" : -1.8013,
+		"best_solution" : [ 2.2029, 1.57079, ]
+		},
+	"Rastrigin":{
+		"seconds_elapsed" : 7.45453,
+		"best_score" : 3.78404e-08,
+		"best_solution" : [ 9.76564e-06, 9.76564e-06, ]
+		},
+	"Rastrigin":{
+		"seconds_elapsed" : 6.92591,
+		"best_score" : 3.78404e-08,
+		"best_solution" : [ -9.76564e-06, 9.76564e-06, ]
+		},
+	"Rastrigin":{
+		"seconds_elapsed" : 6.48316,
+		"best_score" : 3.78404e-08,
+		"best_solution" : [ 9.76564e-06, -9.76564e-06, ]
+		},
+	"Rastrigin":{
+		"seconds_elapsed" : 6.36537,
+		"best_score" : 3.78404e-08,
+		"best_solution" : [ 9.76564e-06, -9.76564e-06, ]
+		},
+	"Rastrigin":{
+		"seconds_elapsed" : 6.55286,
+		"best_score" : 3.78404e-08,
+		"best_solution" : [ 9.76564e-06, 9.76564e-06, ]
+		},
+	"Griewangk":{
+		"seconds_elapsed" : 11.863,
+		"best_score" : 5.9992e-11,
+		"best_solution" : [ 8.9407e-06, -8.9407e-06, ]
+		},
+	"Griewangk":{
+		"seconds_elapsed" : 10.5935,
+		"best_score" : 5.9992e-11,
+		"best_solution" : [ -8.9407e-06, 8.9407e-06, ]
+		},
+	"Griewangk":{
+		"seconds_elapsed" : 11.2736,
+		"best_score" : 5.9992e-11,
+		"best_solution" : [ -8.9407e-06, 8.9407e-06, ]
+		},
+	"Griewangk":{
+		"seconds_elapsed" : 11.2929,
+		"best_score" : 5.9992e-11,
+		"best_solution" : [ -8.9407e-06, 8.9407e-06, ]
+		},
+	"Griewangk":{
+		"seconds_elapsed" : 11.559,
+		"best_score" : 5.9992e-11,
+		"best_solution" : [ -8.9407e-06, -8.9407e-06, ]
+		},
+	"Rosenbrock":{
+		"seconds_elapsed" : 6.46199,
+		"best_score" : 1.61422e-09,
+		"best_solution" : [ 0.999996, 0.999996, ]
+		},
+	"Rosenbrock":{
+		"seconds_elapsed" : 6.06276,
+		"best_score" : 1.73334e-09,
+		"best_solution" : [ 1.00001, 1.00003, ]
+		},
+	"Rosenbrock":{
+		"seconds_elapsed" : 6.28908,
+		"best_score" : 1.61422e-09,
+		"best_solution" : [ 0.999996, 0.999996, ]
+		},
+	"Rosenbrock":{
+		"seconds_elapsed" : 6.58222,
+		"best_score" : 1.73334e-09,
+		"best_solution" : [ 1.00001, 1.00003, ]
+		},
+	"Rosenbrock":{
+		"seconds_elapsed" : 6.32232,
+		"best_score" : 1.61422e-09,
+		"best_solution" : [ 0.999996, 0.999996, ]
+		},
+}
