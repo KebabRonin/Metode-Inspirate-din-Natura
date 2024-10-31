@@ -42,7 +42,7 @@ ParameterList hybrid(
       bestSolution = candidateSolution;
     }
   }
-  bestSolution = hillClimbing(bestSolution, problem, hcIters).first; // Added this
+  bestSolution = hillClimbing(bestSolution, problem).first; // Added this
   ParameterList best_decoded = problem.decodeSolution(bestSolution);
   return best_decoded;
 }
