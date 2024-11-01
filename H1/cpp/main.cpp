@@ -8,6 +8,10 @@ void runHC(int n_dim, int precision, int max_iter);
 void runAG    (int n_dim, int precision, int pop_size, int max_generations);
 void runHybrid(int n_dim, int precision, int pop_size, int max_generations, int max_hc_iters);
 void printFunctions();
+// pt 100 Hibrid 80 80, 60 100 pe acolo
+
+// Eu rulez A 30, 100, H 30
+// el H pe 100
 
 int main(int argc, char** argv) {
 	if (argc < 5) {

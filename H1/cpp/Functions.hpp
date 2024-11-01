@@ -106,8 +106,8 @@ public:
 
 
 static const OptimizationFunction* FUNCTIONS[] = {
-	new Michalewicz(),
-	new Rastrigin(),
+	new Rosenbrock(),
 	new Griewangk(),
-	new Rosenbrock()
+	new Rastrigin(),
+	new Michalewicz()
 };

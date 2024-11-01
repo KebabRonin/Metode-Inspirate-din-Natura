@@ -104,7 +104,7 @@ def mixed_selection(population: list, fitness: list, n: int) -> list:
     n_tournament = n - n_elitism
     selected = elitism_selection(population, fitness, n_elitism)
     selected += tournament_selection(
-        list(filter(lambda x: x in selected, population)),
+        list(filter(lambda x: x in selected, population)), #???? this is just elitism again, straight up ??
         fitness, n_tournament
     )
     return selected
@@ -116,7 +116,7 @@ def ag(problem_repr: dict, pop_size: int, fitness_func, selection_method):
     fitness_pop = evaluate_population(population, fitness_func, problem_repr)
     candidate = sorted(list(zip(population, fitness_pop)), key=lambda x: x[1])[0]
     best_solution = candidate
-    for t in tqdm.trange(300, desc="AG generations", position=0):
+    for t in tqdm.trange(1000, desc="AG generations", position=0):
         population = selection_method(population, fitness_pop, pop_size // 2)
         population = crossover_population(population)
         population = [mutate(individual, mutation_rate) for individual in population]
@@ -130,7 +130,7 @@ def ag(problem_repr: dict, pop_size: int, fitness_func, selection_method):
 
 def main(f):
     func_obj = functions.FUNCTIONS[f]
-    pop_size = 1000
+    pop_size = 500
     precision = 5
     input_dims = 30
     problem_repr = infer_value_space(func_obj, precision, input_dims)

@@ -34,7 +34,9 @@ void improve(Bitstring& vc, const ProblemSpec& problem) {
 	}
 }
 
-
+/**
+ * Modifies the initial bitstring on return.
+ */
 std::pair<Bitstring&, double> hillClimbing(Bitstring& vc, const ProblemSpec& problem, int max_iter=1e9) {
 	double vc_score = problem.getFitness(vc);
 	bool local = false;

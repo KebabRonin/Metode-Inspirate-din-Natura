@@ -9,7 +9,7 @@
 // Genetic algorithm specific types
 typedef std::vector<Bitstring> Population;
 typedef Bitstring Chromosome;
-typedef Population (*SelectionStrategy)(Population&, std::vector<double>&, int);
+typedef Population (*SelectionStrategy)(const Population&, const std::vector<double>&, int);
 
 
 std::vector<int> sortIndexes(const std::vector<double>& populationFitness) {
@@ -17,7 +17,7 @@ std::vector<int> sortIndexes(const std::vector<double>& populationFitness) {
   // initialize original index locations
   std::vector<int> idx(populationFitness.size());
   std::iota(idx.begin(), idx.end(), 0);
-  std::stable_sort(idx.begin(), idx.end(),
+  std::sort(idx.begin(), idx.end(),
        [&populationFitness](int i1, int i2) {return populationFitness[i1] < populationFitness[i2];});
 
   return idx;
@@ -34,10 +34,10 @@ Population generateStartingPopulation(const int popSize, const ProblemSpec& prob
   return pop;
 }
 
-std::vector<double> evaluatePopulation(Population& pop, const ProblemSpec& problem) {
+std::vector<double> evaluatePopulation(const Population& pop, const ProblemSpec& problem) {
   std::vector<double> fitness;
   fitness.reserve(pop.size());
-  for (Chromosome chrom : pop) {
+  for (const Chromosome chrom : pop) {
     fitness.push_back(problem.getFitness(chrom));
   }
   return fitness;
@@ -90,8 +90,9 @@ inline void mutatePopulation(Population& population, double mutationRate) {
 /**
  * Select newPopSize individuals based on random 1v1 tournaments.
  */
-Population tournamentSelection(Population& population, std::vector<double>& fitness, int newPopSize) {
+Population tournamentSelection(const Population& population, const std::vector<double>& fitness, int newPopSize) {
   Population selected;
+  selected.reserve(newPopSize);
   std::uniform_int_distribution<> rand_chrom(0, population.size() - 1);
   for (int i = 0; i < newPopSize; ++i) {
     int idx1 = rand_chrom(rng_generator);
@@ -106,7 +107,7 @@ Population tournamentSelection(Population& population, std::vector<double>& fitn
 }
 
 
-Population elitismSelection(Population& population, std::vector<double>& fitness, int newPopSize) {
+Population elitismSelection(const Population& population, const std::vector<double>& fitness, int newPopSize) {
   std::vector<int> sortedIndexes = sortIndexes(fitness);
   Population newPopulation;
   newPopulation.reserve(newPopSize);
@@ -115,7 +116,7 @@ Population elitismSelection(Population& population, std::vector<double>& fitness
 }
 
 
-Population mixedSelection(Population& population, std::vector<double>& fitness, int newPopSize) {
+Population mixedSelection(const Population& population, const std::vector<double>& fitness, int newPopSize) {
   int elitismCount = newPopSize / 10; // 10% elitism
   int tournamentCount = newPopSize - elitismCount;
   Population selectedElitism = elitismSelection(population, fitness, elitismCount);
@@ -125,7 +126,7 @@ Population mixedSelection(Population& population, std::vector<double>& fitness, 
   return selectedElitism;
 }
 
-ParameterList geneticAlgorithm(int popSize, int generations, float mutationRate, SelectionStrategy selection, const ProblemSpec& problem) {
+ParameterList geneticAlgorithm(int popSize, int generations, double mutationRate, SelectionStrategy selection, const ProblemSpec& problem) {
   Population population = generateStartingPopulation(popSize, problem);
   std::vector<double> populationFitness = evaluatePopulation(population, problem);
   std::vector<int> sortedIndexes = sortIndexes(populationFitness);

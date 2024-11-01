@@ -4,7 +4,8 @@
 #include "GeneticAlgorithm.hpp"
 #include "HillClimbing.hpp"
 
-std::vector<double> evaluatePopulationHybrid(Population& pop, const ProblemSpec& problem, int max_iter=1e9) {
+// pop is a copy so hc does not alter the population
+std::vector<double> evaluatePopulationHybrid(Population& pop, const ProblemSpec& problem, int max_iter=100) {
   std::vector<double> fitness;
   fitness.reserve(pop.size());
   for (Chromosome chrom : pop) {
@@ -15,7 +16,7 @@ std::vector<double> evaluatePopulationHybrid(Population& pop, const ProblemSpec&
 
 ParameterList hybrid(
   int popSize, int generations, float mutationRate, SelectionStrategy selection,
-  const ProblemSpec& problem, int hcIters=1e9
+  const ProblemSpec& problem, int hcIters=100
 ) {
   Population population = generateStartingPopulation(popSize, problem);
   std::vector<double> populationFitness = evaluatePopulationHybrid(population, problem, hcIters);
@@ -33,6 +34,8 @@ ParameterList hybrid(
       [mutationRate](Chromosome& x){mutate(x, mutationRate);}
     );
     // Eval
+    std::cout<<"hybrid population"<<&population<<std::endl;
+    std::cout<<"hybrid population"<<&(population[0])<<std::endl;
     populationFitness = evaluatePopulationHybrid(population, problem, hcIters);
     sortedIndexes = sortIndexes(populationFitness);
     Chromosome candidateSolution = population[sortedIndexes[0]];
@@ -43,7 +46,7 @@ ParameterList hybrid(
     }
     mutationRate *= 0.999;
   }
-  bestSolution = hillClimbing(bestSolution, problem, hcIters).first; // Added this
+  bestSolution = hillClimbing(bestSolution, problem).first; // Added this
   ParameterList best_decoded = problem.decodeSolution(bestSolution);
   return best_decoded;
 }
