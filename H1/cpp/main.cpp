@@ -38,7 +38,7 @@ void runHybrid(int n_dim, int precision, int pop_size, int max_generations, int 
 			precision << "\n\t},";
 
 	for (const OptimizationFunction* func_obj : FUNCTIONS) {
-		for (int i = 0; i < 5; i++) {
+		for (int i = 0; i < 3; i++) {
 			auto start = std::chrono::high_resolution_clock::now();
 
 			// Actual code
@@ -70,7 +70,7 @@ void runAG(int n_dim, int precision, int pop_size, int max_generations) {
 			precision << "\n\t},";
 
 	for (const OptimizationFunction* func_obj : FUNCTIONS) {
-		for (int i = 0; i < 5; i++) {
+		for (int i = 0; i < 3; i++) {
 			auto start = std::chrono::high_resolution_clock::now();
 
 			// Actual code

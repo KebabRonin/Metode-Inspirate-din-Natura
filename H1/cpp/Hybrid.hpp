@@ -4,7 +4,7 @@
 #include "GeneticAlgorithm.hpp"
 #include "HillClimbing.hpp"
 
-std::vector<double> evaluatePopulationHybrid(Population& pop, const ProblemSpec& problem, int max_iter=1e9) {
+std::vector<double> evaluatePopulationHybrid(Population& pop, const ProblemSpec& problem, int max_iter=1000) {
   std::vector<double> fitness;
   fitness.reserve(pop.size());
   for (Chromosome chrom : pop) {
@@ -15,7 +15,7 @@ std::vector<double> evaluatePopulationHybrid(Population& pop, const ProblemSpec&
 
 ParameterList hybrid(
   int popSize, int generations, float mutationRate, SelectionStrategy selection,
-  const ProblemSpec& problem, int hcIters=1e9
+  const ProblemSpec& problem, int hcIters=1000
 ) {
   Population population = generateStartingPopulation(popSize, problem);
   std::vector<double> populationFitness = evaluatePopulationHybrid(population, problem, hcIters);
