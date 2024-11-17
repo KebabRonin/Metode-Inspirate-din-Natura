@@ -72,11 +72,12 @@ class PSO:
         self.global_best_position = np.random.uniform(bounds[0], bounds[1], dimensions)
         self.global_best_value = float('inf')
 
-    def optimize(self):
+    def optimize(self, patience = None, threshold = 0):
         self.last_results = []
-
+        if patience is None:
+            patience = self.max_iter
+        pat = patience
         for iteration in range(self.max_iter):
-
             for particle in self.particles:
                 fitness = particle.evaluate()
                 if fitness < self.global_best_value:
@@ -93,14 +94,21 @@ class PSO:
             # print(f"Iteration {iteration + 1}/{self.max_iter}, Best Fitness: {self.global_best_value}")
             try:
                 if self.last_results[-1][0] != self.global_best_value:
+                    if self.last_results[-1][0] - self.global_best_value >= threshold:
+                        # Reset patience only if improvement >= 0.5
+                        pat = patience
                     self.last_results.append((self.global_best_value, iteration))
             except IndexError:
                 self.last_results.append((self.global_best_value, iteration))
 
+            pat -= 1
+            if pat <= 0:
+                break
+
         return self.global_best_position, self.global_best_value
 
 
-def grid_search(max_iter_options, num_particles_options, w_options, c1_options, c2_options, trials, functions):
+def grid_search(max_iter_options, num_particles_options, w_options, c1_options, c2_options, trials, functions, patience, threshold):
     # Each run has a different output folder
     out_folder_for_run = f"{OUTPUT_FOLDER}/{time.strftime('%m_%d_%H_%M_%S')}"
     os.mkdir(out_folder_for_run)
@@ -123,7 +131,7 @@ def grid_search(max_iter_options, num_particles_options, w_options, c1_options, 
                 for _ in tqdm.trange(trials, desc=f"{fname}, Dimensions: {dimensions}, Max Iters: {max_iter}, Swarm Size: {num_particles}, w: {w}, c1: {c1}, c2: {c2}", position=1, leave=False):
                     # Initialize and run PSO
                     pso = PSO(dimensions, num_particles, (lower_bound, upper_bound), max_iter, function, w, c1, c2)
-                    _, best_fitness = pso.optimize()
+                    _, best_fitness = pso.optimize(patience=patience, threshold=threshold)
                     trial_fitness.append(best_fitness)
                     trial_hists.append(pso.last_results)
 
@@ -183,8 +191,8 @@ if __name__ == "__main__":
     max_iter_options = [3000] # Lasa asa ca oricum converge in mai putine
     num_particles_options = [50, 100, 200]  # 3 variants
     w_options =  [i/10 for i in range(-10, 10+1, 2)] # 10 variants
-    c1_options = [i/10 for i in range(-25, 25+1, 5)] # 10 variants
-    c2_options = [i/10 for i in range(-25, 25+1, 5)] # 10 variants
+    c1_options = [i/10 for i in range(-20, 20+1, 5)] # 8 variants
+    c2_options = [i/10 for i in range(-20, 20+1, 5)] # 8 variants
     num_trials = 30
     # 3 x 10 x 10 x 10 = 3.000 rulari pt o functie ( * 30min = 25h eh it works)
     grid_search(
@@ -194,5 +202,7 @@ if __name__ == "__main__":
         c1_options=c1_options,
         c2_options=c2_options,
         trials=num_trials,
-        functions=["rosenbrock", "michalewicz"]
+        functions=["rastrigin", "griewank", "rosenbrock", "michalewicz"],
+        patience=100, # early stopping
+        threshold=0.3, # early stopping
     )

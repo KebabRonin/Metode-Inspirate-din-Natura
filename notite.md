@@ -99,3 +99,17 @@ intreaba de elitism + xover random
 xover rate??? - la noi e cu proportie cum am zis mai sus
 
 se poate da merge la H1' si H1
+
+
+## Lab sapt 7
+
+PSO - nr reale
+
+100 ok, 50 bun, 20 sa zicem
+
+velocities, nr iter, dim swarm: in this order
+
+ce i-a dat lui bine: 1, 2.5, 2.5
+
+
+sapt asta fara curs, recup sapt 8 pe linkul de seminar
