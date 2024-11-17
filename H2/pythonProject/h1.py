@@ -1,7 +1,7 @@
 import itertools
 import numpy as np
 import pandas as pd
-
+import tqdm, json, time
 
 def rastrigin(position):
     return 10 * len(position) + sum([(x ** 2 - 10 * np.cos(2 * np.pi * x)) for x in position])
@@ -73,6 +73,7 @@ class PSO:
         self.global_best_value = float('inf')
 
     def optimize(self):
+        self.last_results = []
 
         for iteration in range(self.max_iter):
 
@@ -89,25 +90,26 @@ class PSO:
                 particle.update_velocity(self.global_best_position, particle_w, particle_c1, particle_c2)
                 particle.update_position(self.bounds)
 
-            print(f"Iteration {iteration + 1}/{self.max_iter}, Best Fitness: {self.global_best_value}")
+            # print(f"Iteration {iteration + 1}/{self.max_iter}, Best Fitness: {self.global_best_value}")
+            try:
+                if self.last_results[-1][0] != self.global_best_value:
+                    self.last_results.append((self.global_best_value, iteration))
+            except IndexError:
+                self.last_results.append((self.global_best_value, iteration))
 
         return self.global_best_position, self.global_best_value
 
 
-def grid_search():
-    # Define parameter ranges for the grid search
-    max_iter_options = [500, 1000, 2000]
-    num_particles_options = [50, 100, 200]
-    w_options = [0.2, 0.5, 0.8]
-    c1_options = [1.0, 1.5, 2.0]
-    c2_options = [1.0, 1.5, 2.0]
-    trials = 30
+def grid_search(max_iter_options, num_particles_options, w_options, c1_options, c2_options, trials=30):
+    # Each run has a different output folder
+    out_folder_for_run = f"{OUTPUT_FOLDER}/{time.strftime('%m_%d_%H_%M_%S')}"
+    os.mkdir(out_folder_for_run)
 
     # Collect results
     all_results = []
     best_results = {}
 
-    for name, (function, lower_bound, upper_bound) in functions.items():
+    for fname, (function, lower_bound, upper_bound) in functions.items():
         for dimensions in [2, 30, 100]:
             best_config = None
             best_mean_fitness = float('inf')
@@ -116,11 +118,13 @@ def grid_search():
                     max_iter_options, num_particles_options, w_options, c1_options, c2_options
             ):
                 trial_fitness = []
-                for _ in range(trials):
+                trial_hists = []
+                for _ in tqdm.trange(trials, desc=f"{fname}, Dimensions: {dimensions}, Max Iters: {max_iter}, Swarm Size: {num_particles}, w: {w}, c1: {c1}, c2: {c2}"):
                     # Initialize and run PSO
                     pso = PSO(dimensions, num_particles, (lower_bound, upper_bound), max_iter, function, w, c1, c2)
                     _, best_fitness = pso.optimize()
                     trial_fitness.append(best_fitness)
+                    trial_hists.append(pso.last_results)
 
                 # Calculate statistics
                 mean_fitness = np.mean(trial_fitness)
@@ -128,7 +132,7 @@ def grid_search():
 
                 # Save the result
                 config = {
-                    "Function": name,
+                    "Function": fname,
                     "Dimensions": dimensions,
                     "Max Iterations": max_iter,
                     "Swarm Size": num_particles,
@@ -136,8 +140,10 @@ def grid_search():
                     "Cognitive Constant (c1)": c1,
                     "Social Constant (c2)": c2,
                     "Mean Fitness": mean_fitness,
-                    "Std Fitness": std_fitness
+                    "Std Fitness": std_fitness,
+                    "Histories": trial_hists
                 }
+                json.dump(config, open(f"{out_folder_for_run}/{fname}_{dimensions}_{max_iter}_{num_particles}_{w}_{c1}_{c2}_{time.time()}.json", "w"))
                 all_results.append(config)
 
                 # Check if this is the best configuration for this function and dimension
@@ -147,7 +153,7 @@ def grid_search():
 
             # Save the best configuration for this function and dimension
             if best_config:
-                key = (name, dimensions)
+                key = (fname, dimensions)
                 best_results[key] = best_config
 
     # Convert results to DataFrame and save
@@ -163,5 +169,27 @@ def grid_search():
     print(" - pso_best_configurations.csv")
 
 
+OUTPUT_FOLDER = "pso_results"
+import os
+try:
+    os.mkdir(OUTPUT_FOLDER)
+except:
+    pass
+
 if __name__ == "__main__":
-    grid_search()
+    # Define parameter ranges for the grid search
+    max_iter_options = [2000] # Lasa asa ca oricum converge in mai putine
+    num_particles_options = [50, 100, 200, 500] # [i * 10 for i in range(1, 100)]  # 100 variants
+    w_options =  [i for i in range(-5, 5, 0.1)] # 100 variants
+    c1_options = [i for i in range(-5, 5, 0.1)] # 100 variants
+    c2_options = [i for i in range(-5, 5, 0.1)] # 100 variants
+    num_trials = 50
+    # 100 x 100 x 100 x 100 = 1e8 rulari pt o functie
+    grid_search(
+        max_iter_options=max_iter_options,
+        num_particles_options=num_particles_options,
+        w_options=w_options,
+        c1_options=c1_options,
+        c2_options=c2_options,
+        trials=num_trials
+    )
