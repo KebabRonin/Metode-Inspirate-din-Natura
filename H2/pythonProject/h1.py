@@ -182,9 +182,9 @@ if __name__ == "__main__":
     # Define parameter ranges for the grid search
     max_iter_options = [3000] # Lasa asa ca oricum converge in mai putine
     num_particles_options = [50, 100, 200]  # 3 variants
-    w_options =  [i/10 for i in range(-10, 10, 2)] # 10 variants
-    c1_options = [i/10 for i in range(-25, 25, 5)] # 10 variants
-    c2_options = [i/10 for i in range(-25, 25, 5)] # 10 variants
+    w_options =  [i/10 for i in range(-10, 10+1, 2)] # 10 variants
+    c1_options = [i/10 for i in range(-25, 25+1, 5)] # 10 variants
+    c2_options = [i/10 for i in range(-25, 25+1, 5)] # 10 variants
     num_trials = 30
     # 3 x 10 x 10 x 10 = 3.000 rulari pt o functie ( * 30min = 25h eh it works)
     grid_search(
@@ -194,5 +194,5 @@ if __name__ == "__main__":
         c1_options=c1_options,
         c2_options=c2_options,
         trials=num_trials,
-        functions=["rastrigin", "griewank", "rosenbrock", "michalewicz"]
+        functions=["rosenbrock", "michalewicz"]
     )
