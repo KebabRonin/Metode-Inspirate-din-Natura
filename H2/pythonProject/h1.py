@@ -77,7 +77,8 @@ class PSO:
         if patience is None:
             patience = self.max_iter
         pat = patience
-        for iteration in range(self.max_iter):
+        pbar = tqdm.trange(self.max_iter, leave=False, position=2)
+        for iteration in pbar:
             for particle in self.particles:
                 fitness = particle.evaluate()
                 if fitness < self.global_best_value:
@@ -103,96 +104,85 @@ class PSO:
 
             pat -= 1
             if pat <= 0:
+                print(f"Patience reached at iteration {iteration + 1}/{self.max_iter}, Best Fitness: {self.global_best_value}", file=open('log.txt', 'wt'))
                 break
+            pbar.set_postfix_str(f"{self.global_best_value:.8f} fitness")
 
         return self.global_best_position, self.global_best_value
 
 
-def grid_search(max_iter_options, num_particles_options, w_options, c1_options, c2_options, trials, functions, patience, threshold):
+def grid_search(cfgs, trials):
     # Each run has a different output folder
     out_folder_for_run = f"{OUTPUT_FOLDER}/{time.strftime('%m_%d_%H_%M_%S')}"
     os.mkdir(out_folder_for_run)
 
     # Collect results
     all_results = []
-    best_results = {}
 
-    for fname in functions:
+    for fname, dimensions, max_iter, patience, num_particles, w, c1, c2 in tqdm.tqdm(cfgs, desc="Grid Search", position=0, leave=False):
         function, lower_bound, upper_bound = FUNCTIONS[fname]
-        for dimensions in DIMS:
-            best_config = None
-            best_mean_fitness = float('inf')
+        trial_fitness = []
+        trial_hists = []
+        for _ in tqdm.trange(trials, desc=f"{fname}, Dimensions: {dimensions}, Max Iters: {max_iter}, Swarm Size: {num_particles}, w: {w}, c1: {c1}, c2: {c2}", position=1, leave=False):
+            # Initialize and run PSO
+            pso = PSO(dimensions, num_particles, (lower_bound, upper_bound), max_iter, function, w, c1, c2)
+            _, best_fitness = pso.optimize(patience=patience, threshold=0.3)
+            trial_fitness.append(best_fitness)
+            trial_hists.append(pso.last_results)
 
-            for max_iter, num_particles, w, c1, c2 in tqdm.tqdm(itertools.product(
-                    max_iter_options, num_particles_options, w_options, c1_options, c2_options
-            ), desc="Grid Search", position=0, leave=False, total=len(max_iter_options) * len(num_particles_options) * len(w_options) * len(c1_options) * len(c2_options)):
-                trial_fitness = []
-                trial_hists = []
-                for _ in tqdm.trange(trials, desc=f"{fname}, Dimensions: {dimensions}, Max Iters: {max_iter}, Swarm Size: {num_particles}, w: {w}, c1: {c1}, c2: {c2}", position=1, leave=False):
-                    # Initialize and run PSO
-                    pso = PSO(dimensions, num_particles, (lower_bound, upper_bound), max_iter, function, w, c1, c2)
-                    _, best_fitness = pso.optimize(patience=patience, threshold=threshold)
-                    trial_fitness.append(best_fitness)
-                    trial_hists.append(pso.last_results)
+        # Calculate statistics
+        mean_fitness = np.mean(trial_fitness)
+        std_fitness = np.std(trial_fitness)
 
-                # Calculate statistics
-                mean_fitness = np.mean(trial_fitness)
-                std_fitness = np.std(trial_fitness)
-
-                # Save the result
-                config = {
-                    "Function": fname,
-                    "Dimensions": dimensions,
-                    "Max Iterations": max_iter,
-                    "Swarm Size": num_particles,
-                    "Momentum (w)": w,
-                    "Cognitive Constant (c1)": c1,
-                    "Social Constant (c2)": c2,
-                    "Mean Fitness": mean_fitness,
-                    "Std Fitness": std_fitness,
-                    "Histories": trial_hists
-                }
-                json.dump(config, open(f"{out_folder_for_run}/timeat_{time.strftime('%m_%d_%H_%M_%S')}_config_{fname}_{dimensions}_{max_iter}_{num_particles}_{w}_{c1}_{c2}.json", "w"))
-                all_results.append(config)
-
-                # Check if this is the best configuration for this function and dimension
-                if mean_fitness < best_mean_fitness:
-                    best_mean_fitness = mean_fitness
-                    best_config = config
-
-            # Save the best configuration for this function and dimension
-            if best_config:
-                key = (fname, dimensions)
-                best_results[key] = best_config
-
-    # Convert results to DataFrame and save
-    all_results_df = pd.DataFrame(all_results)
-    all_results_df.to_csv(out_folder_for_run + "/pso_grid_search_results.csv", index=False)
-
-    # Convert best results to DataFrame and save
-    best_results_df = pd.DataFrame(best_results.values())
-    best_results_df.to_csv(out_folder_for_run + "/pso_best_configurations.csv", index=False)
+        # Save the result
+        config = {
+            "Function": fname,
+            "Dimensions": dimensions,
+            "Max Iterations": max_iter,
+            "Swarm Size": num_particles,
+            "Momentum (w)": w,
+            "Cognitive Constant (c1)": c1,
+            "Social Constant (c2)": c2,
+            "Mean Fitness": mean_fitness,
+            "Std Fitness": std_fitness,
+            "Histories": trial_hists
+        }
+        json.dump(config, open(f"{out_folder_for_run}/timeat_{time.strftime('%m_%d_%H_%M_%S')}_config_{fname}_{dimensions}_{max_iter}_{num_particles}_{w}_{c1}_{c2}.json", "w"))
+        all_results.append(config)
 
     print("Grid search completed. Results saved to:")
-    print(" - pso_grid_search_results.csv")
-    print(" - pso_best_configurations.csv")
 
-DIMS = [2, 30, 100]
+# rosenbrock 10.000iters da 0 pt -0.6, 0, 2.5 (30 dims, 200 particles)
 
+cfgs = [
+    # ('rosenbrock', 2, 50, -0.2, -1.0, 2.0), # skip as it is already 0
+    # ('rosenbrock', 30, 20_000, 1e10, 200, -0.6, 0.0, 1.5),
+    # ('rosenbrock', 30, 3_000, 100, 200, -0.6, 0.0, 2.5), # mine
+    # ('rosenbrock', 100, 20_000, 1e10, 200, -0.2, 2.0, 2.0),
+    # # ('griewank', 2, 200, 0.6, 1.5, 0.5), # These are close enough to 0
+    # ('griewank', 30, 200, -0.2, 2.0, 2.0),
+    # ('griewank', 100, 200, -0.2, 2.0, 0.5),
+    # ('michalewicz', 2, 20_000, 1e10, 50, -0.6, -1.0, 1.5),
+    ('michalewicz', 30, 20_000, 1e10, 200, -0.6, 2.0, -1.0),
+    ('michalewicz', 100, 20_000, 1e10, 200, -0.6, 2.0, -1.0),
+    ('rosenbrock', 30, 20_000, 1e10, 200, -0.6, 0.0, 2.5), # mine
+]
 OUTPUT_FOLDER = "pso_results"
 import os
 try:
     os.mkdir(OUTPUT_FOLDER)
 except:
     pass
-
+# maybe this too? S=69 w=-0.4438 c1=-0.2699 c2=3.3950
+# grid_search(cfgs, 30)
+# exit(0)
 if __name__ == "__main__":
     # Define parameter ranges for the grid search
     max_iter_options = [3000] # Lasa asa ca oricum converge in mai putine
-    num_particles_options = [50, 100, 200]  # 3 variants
-    w_options =  [i/10 for i in range(-10, 10+1, 2)] # 10 variants
-    c1_options = [i/10 for i in range(-20, 20+1, 5)] # 8 variants
-    c2_options = [i/10 for i in range(-20, 20+1, 5)] # 8 variants
+    num_particles_options = [200]  # 3 variants
+    w_options =  [-0.2] # 8 variants
+    c1_options = [-2.0] # 8 variants
+    c2_options = [0.5, 1.0, 1.5, 2.0] # 8 variants
     num_trials = 30
     # 3 x 10 x 10 x 10 = 3.000 rulari pt o functie ( * 30min = 25h eh it works)
     grid_search(
@@ -202,7 +192,7 @@ if __name__ == "__main__":
         c1_options=c1_options,
         c2_options=c2_options,
         trials=num_trials,
-        functions=["rastrigin", "griewank", "rosenbrock", "michalewicz"],
+        functions=["griewank"],
         patience=100, # early stopping
         threshold=0.3, # early stopping
     )
