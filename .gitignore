@@ -4,3 +4,4 @@ __pycache__
 H1/cpp/output
 *.json
 *.pkl
+*.png

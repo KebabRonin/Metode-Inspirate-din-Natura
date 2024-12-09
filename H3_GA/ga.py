@@ -1,4 +1,4 @@
-import numpy as np, random, tqdm, copy
+import numpy as np, random, tqdm, copy, math, time
 import matplotlib.pyplot as plt
 COORDS = None
 def create_distance_matrix(tsp_content):
@@ -226,8 +226,8 @@ class MTSPPopulation:
                 city_positions = {city: [(salesman_idx, i) for salesman_idx, salesman_tour in enumerate(offspring.chromosomes) for i, tcity in enumerate(salesman_tour) if tcity == city] for city in range(1, len(self.distance_matrix) + 1) if city != self.depot}
         return offspring
 
-    def breed_new_population(self, tournament_size: int = 3) -> list[MTSPIndividual]:
-        new_solutions = [self.tournament_selection(tournament_size) for _ in range(self.pop_size//2)]
+    def breed_new_population(self, tournament_size: int, crossover_rate: float) -> list[MTSPIndividual]:
+        new_solutions = [self.tournament_selection(tournament_size) for _ in range(int(self.pop_size*crossover_rate))]
         while len(new_solutions) < self.pop_size:
             parent1 = self.tournament_selection(tournament_size)
             parent2 = self.tournament_selection(tournament_size)
@@ -244,41 +244,71 @@ class MTSPPopulation:
             a += f"* Solution {i+1}: {sol}"
         return a
 
-def ag(population: MTSPPopulation):
-    for t in tqdm.trange(100, desc="AG generations", position=0):
-        for i in range(population.pop_size):
-            tournament = population.tournament_selection()
-            mutated = population.mutate(tournament)
-            population.replace_solution(i, mutated)
+def plot_sol(best):
+    plt.cla()
+    plt.scatter(list(map(lambda x: x[0], COORDS)), list(map(lambda x: x[1], COORDS)))
+    for tour in best.chromosomes:
+        plt.plot(list(map(lambda x: COORDS[x-1][0], tour)), list(map(lambda x: COORDS[x-1][1], tour)))
+    plt.pause(0.05)
+
+def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, mutation_rate, crossover_rate):
+    population = MTSPPopulation(distance_matrix, n_salesmen=n_salesmen, pop_size=pop_size)
+    pbar = tqdm.trange(max_gens, desc="AG generations", position=0)
+    hist = []
+    mrate = mutation_rate
+    crate = crossover_rate
+    best = copy.deepcopy(population.get_best_solution())
+    liter = 0
+    for t in pbar:
+        # Crossover + Selection
+        population.solutions = population.breed_new_population(tournament_size=10, crossover_rate=crate)
+        # Mutation
+        [sol.mutation(mrate) for sol in population.solutions]
+        if population.get_best_solution().calculate_fitness()[1] < best.calculate_fitness()[1]:
+            best = copy.deepcopy(population.get_best_solution())
+            plot_sol(best)
+        hist.append(population.get_best_solution().calculate_fitness()[1])
+        if t - liter > 20 and np.var(hist[-20:]) < 5:
+            print(mrate, crate)
+            mrate = 1
+            crate = 0.9
+            liter = t
+        else:
+            if mrate > mutation_rate:
+                mrate *= 0.95
+                if mrate < mutation_rate:
+                    mrate = mutation_rate
+            if crate > crossover_rate:
+                crate *= 0.95
+                if crate < crossover_rate:
+                    crate = crossover_rate
+        pbar.set_postfix_str(f"Best solution: {population.get_best_solution().calculate_fitness()[1]:.5f}")
+    plt.savefig(f"{INSTANCE}_{time.time()}_{POPSIZE}pop_path.png")
+    plt.show()
+    plt.plot(hist)
+    plt.savefig(f"{time.time()}_hist.png")
+    plt.show()
+    print(f"Best solution in all:\n{best}")
+
+    min_fitness_scores, avg_fitness_scores, min_total, avg_total, min_max, avg_max = population.get_population_stats()
+    print(f"Final Population stats:\nMin total cost: {min_total:.2f}\nAvg total cost: {avg_total:.2f}")
+    print(f"Min max cost: {min_max:.2f}\nAvg max cost: {avg_max:.2f}")
+    print(f"Min fitness: {min_fitness_scores:.2f}\nAvg fitness: {avg_fitness_scores:.2f}")
+
 
 
 ## git clone https://github.com/mastqe/tsplib
-eil51 = create_distance_matrix(open('H3_GA/tsplib/eil51.tsp', 'rt').read())
-population = MTSPPopulation(eil51, n_salesmen=2, pop_size=300)
-pbar = tqdm.trange(500, desc="AG generations", position=0)
-hist = []
+INSTANCE = 'eil51'
+SALESMEN = 2
+POPSIZE = 500
+GENERATIONS = 1500
 MUTATION_RATE = 0.1
-best = copy.deepcopy(population.get_best_solution())
-for t in pbar:
-    # Crossover + Selection
-    population.solutions = population.breed_new_population(tournament_size=3)
-    # Mutation
-    [sol.mutation(MUTATION_RATE) for sol in population.solutions]
-    if population.get_best_solution().calculate_fitness()[1] < best.calculate_fitness()[1]:
-        best = copy.deepcopy(population.get_best_solution())
-    hist.append(population.get_best_solution().calculate_fitness()[1])
-    pbar.set_postfix_str(f"Best solution: {population.get_best_solution().calculate_fitness()[1]:.5f}")
-
-plt.plot(hist)
-plt.show()
-
-plt.scatter(list(map(lambda x: x[0], COORDS)), list(map(lambda x: x[1], COORDS)))
-for tour in best.chromosomes:
-    plt.plot(list(map(lambda x: COORDS[x-1][0], tour)), list(map(lambda x: COORDS[x-1][1], tour)))
-plt.show()
-print(f"Best solution in all:\n{best}")
-
-min_fitness_scores, avg_fitness_scores, min_total, avg_total, min_max, avg_max = population.get_population_stats()
-print(f"Final Population stats:\nMin total cost: {min_total:.2f}\nAvg total cost: {avg_total:.2f}")
-print(f"Min max cost: {min_max:.2f}\nAvg max cost: {avg_max:.2f}")
-print(f"Min fitness: {min_fitness_scores:.2f}\nAvg fitness: {avg_fitness_scores:.2f}")
+CROSSOVER_RATE = 0.5
+run_ag(
+    create_distance_matrix(open(f'H3_GA/tsplib/{INSTANCE}.tsp', 'rt').read()),
+    SALESMEN,
+    POPSIZE,
+    GENERATIONS,
+    MUTATION_RATE,
+    CROSSOVER_RATE
+)
