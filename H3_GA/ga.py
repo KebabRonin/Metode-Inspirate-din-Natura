@@ -1,7 +1,8 @@
-import numpy as np, random, tqdm, math
-
+import numpy as np, random, tqdm, copy
+import matplotlib.pyplot as plt
+COORDS = None
 def create_distance_matrix(tsp_content):
-    # Parse coordinates
+    global COORDS
     coords = []
     lines = tsp_content.strip().split('\n')
     for line in lines:
@@ -12,14 +13,13 @@ def create_distance_matrix(tsp_content):
             break
 
         try:
-            # Try to parse as coordinate line
             node_id, x, y = map(float, line.strip().split())
             coords.append((x, y))
         except ValueError:
             continue
 
-    # Convert to numpy array
     coords = np.array(coords)
+    COORDS = coords
     n = len(coords)
 
     # Create distance matrix
@@ -82,16 +82,13 @@ class MTSPIndividual:
 
     def calculate_fitness(self, w1=0.5, w2=0.5) -> float:
         """
-        Calculate weighted fitness score.
         w1: weight for total cost
         w2: weight for maximum tour cost
-        Returns lower score for better solutions
         """
         tour_costs = [self.calculate_tour_cost(tour) for tour in self.chromosomes]
         total_cost = sum(tour_costs)
         max_cost = max(tour_costs)
 
-        # Normalize costs by number of tours
         avg_cost = total_cost / len(self.chromosomes)
 
         # Weighted sum of objectives
@@ -110,30 +107,38 @@ class MTSPIndividual:
             output += f"Salesman {i+1}: {tour}\n"
         return output
 
-    def in_route_mutation(self, mutation_rate: float = 0.1) -> None:
-        """
-        Performs in-route mutation on a random chromosome by inverting a subsection.
-        Preserves depot cities at start/end of route.
-        """
+    def in_route_mutation(self, mutation_rate: float) -> None:
         if random.random() > mutation_rate:
             return
 
-        # Select random chromosome
         chromosome_idx = random.randint(0, len(self.chromosomes) - 1)
         chromosome = self.chromosomes[chromosome_idx]
 
-        # Cannot mutate if route only has depot cities
-        if len(chromosome) <= 3:
+        if len(chromosome) < 4:
             return
-
-        # Select random subsection (excluding depot cities)
-        start = random.randint(1, len(chromosome) - 4)
-        end = random.randint(start, len(chromosome) - 2)
+        start = random.randint(1, len(chromosome) - 3)
+        leng = random.sample(list(range(2, len(chromosome) - start)), 1)[0]
 
         # Invert subsection
-        self.chromosomes[chromosome_idx][start:end + 1] = \
-            self.chromosomes[chromosome_idx][start:end + 1][::-1]
+        self.chromosomes[chromosome_idx][start:start + leng] = \
+            self.chromosomes[chromosome_idx][start:start + leng][::-1]
+    
+    def cross_route_mutation(self, mutation_rate: float):
+        """Move a city to another salesman"""
+        if random.random() > mutation_rate:
+            return
+        salesmen = list(range(self.n_salesmen))
+        s1, s2 = random.sample(salesmen, 2)
+        if len(self.chromosomes[s1]) <= 3:
+            return
+        cutoff = random.randint(1, len(self.chromosomes[s1][1:-1]))
+        self.chromosomes[s2].insert(-1, self.chromosomes[s1].pop(cutoff))
 
+    def mutation(self, mutation_rate: float):
+        if random.random() > 0.5:
+            self.in_route_mutation(mutation_rate)
+        else:
+            self.cross_route_mutation(mutation_rate)
 
 class MTSPPopulation:
     def __init__(self, distance_matrix: np.ndarray, n_salesmen: int, pop_size: int, depot: int = 1):
@@ -155,7 +160,6 @@ class MTSPPopulation:
 
     def tournament_selection(self, tournament_size: int) -> MTSPIndividual:
         tournament = random.sample(self.solutions, tournament_size)
-        # print(tournament)
         return min(tournament, key=lambda x: x.calculate_fitness()[0])
 
     def replace_solution(self, index: int, new_solution: MTSPIndividual) -> None:
@@ -178,29 +182,23 @@ class MTSPPopulation:
             p2_route = parent2.chromosomes[salesman_idx]
             route_length = len(p1_route)
 
-            # Select crossover points
             start = random.randint(1, route_length - 4)
             end = random.randint(start, route_length - 2)
 
-            # Initialize offspring route with placeholders
             offspring_route = [-1] * route_length
             offspring_route[0] = offspring_route[-1] = self.depot
 
-            # Step 2: Copy segment from parent1
             offspring_route[start:end + 1] = p1_route[start:end + 1]
 
-            # Step 3: Fill remaining positions with cities from parent2
             used_cities = set(offspring_route[start:end + 1])
             remaining_cities = [city for city in p2_route
                               if city not in used_cities and city != self.depot]
             try:
-                # Fill positions before crossover segment
                 idx = 0
                 for i in range(1, start):
                     offspring_route[i] = remaining_cities[idx]
                     idx += 1
 
-                # Fill positions after crossover segment
                 for i in range(end + 1, route_length - 1):
                     offspring_route[i] = remaining_cities[idx]
                     idx += 1
@@ -210,11 +208,7 @@ class MTSPPopulation:
             offspring.chromosomes.append(list(filter(lambda x: x != -1, offspring_route)))
 
         # Fix the generated offspring
-        # unused_cities = set(range(1, self.n_cities + 1)) - set(sum(offspring.chromosomes, []))
-        # encountered_cities = []
         city_positions = {city: [(salesman_idx, i) for salesman_idx, salesman_tour in enumerate(offspring.chromosomes) for i, tcity in enumerate(salesman_tour) if tcity == city] for city in range(1, len(self.distance_matrix) + 1) if city != self.depot}
-        # print(offspring.chromosomes)
-        # print(city_positions)
         for city in city_positions.keys():
             if len(city_positions[city]) == 1:
                 continue
@@ -225,16 +219,15 @@ class MTSPPopulation:
                         offspring.chromosomes[pos[0]].pop(pos[1])
                 city_positions = {city: [(salesman_idx, i) for salesman_idx, salesman_tour in enumerate(offspring.chromosomes) for i, tcity in enumerate(salesman_tour) if tcity == city] for city in range(1, len(self.distance_matrix) + 1) if city != self.depot}
             elif len(city_positions[city]) < 1:
-                # Change this
+                # Change this?
                 salesman_idx = random.randint(0, self.n_salesmen - 1)
                 city_position = random.randint(1, len(offspring.chromosomes[salesman_idx]) - 2)
                 offspring.chromosomes[salesman_idx].insert(city_position, city)
                 city_positions = {city: [(salesman_idx, i) for salesman_idx, salesman_tour in enumerate(offspring.chromosomes) for i, tcity in enumerate(salesman_tour) if tcity == city] for city in range(1, len(self.distance_matrix) + 1) if city != self.depot}
-        # print(offspring.chromosomes)
         return offspring
 
     def breed_new_population(self, tournament_size: int = 3) -> list[MTSPIndividual]:
-        new_solutions = []
+        new_solutions = [self.tournament_selection(tournament_size) for _ in range(self.pop_size//2)]
         while len(new_solutions) < self.pop_size:
             parent1 = self.tournament_selection(tournament_size)
             parent2 = self.tournament_selection(tournament_size)
@@ -264,23 +257,28 @@ eil51 = create_distance_matrix(open('H3_GA/tsplib/eil51.tsp', 'rt').read())
 population = MTSPPopulation(eil51, n_salesmen=2, pop_size=300)
 pbar = tqdm.trange(500, desc="AG generations", position=0)
 hist = []
+MUTATION_RATE = 0.1
+best = copy.deepcopy(population.get_best_solution())
 for t in pbar:
     # Crossover + Selection
-    population.solutions = population.breed_new_population()
+    population.solutions = population.breed_new_population(tournament_size=3)
     # Mutation
-    [sol.in_route_mutation() for sol in population.solutions]
-    hist.append(population.get_best_solution().calculate_fitness()[0])
+    [sol.mutation(MUTATION_RATE) for sol in population.solutions]
+    if population.get_best_solution().calculate_fitness()[1] < best.calculate_fitness()[1]:
+        best = copy.deepcopy(population.get_best_solution())
+    hist.append(population.get_best_solution().calculate_fitness()[1])
     pbar.set_postfix_str(f"Best solution: {population.get_best_solution().calculate_fitness()[1]:.5f}")
 
-import matplotlib.pyplot as plt
 plt.plot(hist)
 plt.show()
 
-# print
-best = population.get_best_solution()
-print(f"Best solution in population:\n{best}")
+plt.scatter(list(map(lambda x: x[0], COORDS)), list(map(lambda x: x[1], COORDS)))
+for tour in best.chromosomes:
+    plt.plot(list(map(lambda x: COORDS[x-1][0], tour)), list(map(lambda x: COORDS[x-1][1], tour)))
+plt.show()
+print(f"Best solution in all:\n{best}")
 
 min_fitness_scores, avg_fitness_scores, min_total, avg_total, min_max, avg_max = population.get_population_stats()
-print(f"Population stats:\nMin total cost: {min_total:.2f}\nAvg total cost: {avg_total:.2f}")
+print(f"Final Population stats:\nMin total cost: {min_total:.2f}\nAvg total cost: {avg_total:.2f}")
 print(f"Min max cost: {min_max:.2f}\nAvg max cost: {avg_max:.2f}")
 print(f"Min fitness: {min_fitness_scores:.2f}\nAvg fitness: {avg_fitness_scores:.2f}")
