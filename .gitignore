@@ -2,3 +2,6 @@ __pycache__
 *.exe
 .vs
 H1/cpp/output
+*.json
+*.pkl
+*.png
