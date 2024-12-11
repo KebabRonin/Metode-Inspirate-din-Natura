@@ -1,4 +1,4 @@
-import numpy as np, random, tqdm, copy, math, time
+import numpy as np, random, tqdm, copy, math, time, os
 import matplotlib.pyplot as plt
 COORDS = None
 def create_distance_matrix(tsp_content):
@@ -7,7 +7,6 @@ def create_distance_matrix(tsp_content):
     lines = tsp_content.strip().split('\n')
     for line in lines:
         if line.strip() == 'NODE_COORD_SECTION':
-            parsing_coords = True
             continue
         if line.strip() == 'EOF':
             break
@@ -106,8 +105,8 @@ class MTSPIndividual:
         output = ""
         for i, tour in enumerate(self.chromosomes):
             output += f"  {tour},\n"
-        return f"Fitness Score: {fitness_score:.2f}, Total Cost: {total_cost:.2f}, Max Tour Cost: {max_cost:.2f}" + \
-            f" ({list(map(lambda x: self.calculate_tour_cost(x), self.chromosomes))}) "+\
+        return f"Fitness Score: {fitness_score:.2f}, Total Cost: {total_cost:.2f}, Max Tour Cost: {max_cost:.2f}||" + \
+            " ".join([f"{float(self.calculate_tour_cost(tour)):.4f}" for tour in self.chromosomes]) + \
             f"[\n{output}]"
 
     def in_route_mutation(self, mutation_rate: float) -> None:
@@ -250,17 +249,22 @@ class MTSPPopulation:
         return a
 
 def plot_sol(best):
+    colors = ['b', 'r', 'g', 'm', 'c', 'y', 'k']
     plt.cla()
     plt.scatter(list(map(lambda x: x[0], COORDS)), list(map(lambda x: x[1], COORDS)))
-    for tour in best.chromosomes:
-        plt.plot(list(map(lambda x: COORDS[x-1][0], tour)), list(map(lambda x: COORDS[x-1][1], tour)))
+    for i, tour in enumerate(best.chromosomes):
+        color = colors[i % len(colors)]
+        plt.plot(list(map(lambda x: COORDS[x-1][0], tour)), list(map(lambda x: COORDS[x-1][1], tour)),
+            color=color,
+            label=f'Salesman {i + 1}')
     plt.pause(0.05)
 
-def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, mutation_rate, crossover_rate):
-    population = MTSPPopulation(distance_matrix, n_salesmen=n_salesmen, pop_size=pop_size)
+def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, soft_restart_count, mutation_rate, crossover_rate, population=None, draw_plot=True):
+    if population is None:
+        population = MTSPPopulation(distance_matrix, n_salesmen=n_salesmen, pop_size=pop_size)
     pbar = tqdm.trange(max_gens, desc="AG generations", position=0)
     hist = []
-    restarts = 10
+    restarts = soft_restart_count
     mrate = mutation_rate
     crate = crossover_rate
     best = copy.deepcopy(population.get_best_solution())
@@ -274,11 +278,11 @@ def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, mutation_rate, cross
         [sol.mutation(mrate) for sol in population.solutions]
         if not np.all([sol.is_valid() for sol in population.solutions]):
             raise Exception("Bad mutation")
-        if population.get_best_solution().calculate_fitness()[1] < best.calculate_fitness()[1]:
+        if population.get_best_solution().calculate_fitness()[0] < best.calculate_fitness()[0]:
             best = copy.deepcopy(population.get_best_solution())
             plot_sol(best)
-        hist.append(population.get_best_solution().calculate_fitness()[1])
-        if t - liter > 30 and np.var(hist[-30:]) < 5:
+        hist.append(population.get_best_solution().calculate_fitness())
+        if t - liter > 50 and np.var(list(map(lambda x: x[0], hist[-50:]))) < 5:
             # print(mrate, crate)
             mrate = 0.9
             crate = 0.1
@@ -295,13 +299,23 @@ def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, mutation_rate, cross
                 crate *= 1.1
                 if crate > crossover_rate:
                     crate = crossover_rate
-        pbar.set_postfix_str(f"[{restarts}] Best solution: {population.get_best_solution().calculate_fitness()[1]:.5f}")
-    # plt.savefig(f"{INSTANCE}_{time.time()}_{POPSIZE}pop_path.png")
-    plt.show()
-    plt.plot(hist)
-    # plt.savefig(f"{time.time()}_hist.png")
-    plt.show()
-    print(f"Best solution in all:\n{best}")
+        besst = population.get_best_solution().calculate_fitness()
+        besst = f"Fit:{besst[0]:.5f}|Total:{besst[1]:.5f}|Max:{besst[2]:.5f}"
+        pbar.set_postfix_str(f"[{restarts}] Best solution: {besst}")
+    if draw_plot:
+        if not os.path.exists(f"H3_GA/{INSTANCE}"):
+            os.makedirs(f"H3_GA/{INSTANCE}")
+        tt = int(time.time())
+        plt.savefig(f"H3_GA/{INSTANCE}/{tt}_path.png")
+        plt.show()
+        fit, tot, mx = list(zip(*hist))
+        plt.plot(fit, label=f'Fitness ({W1} avg, {W2} max)')
+        plt.plot(tot, label=f'Total length')
+        plt.plot(mx, label=f'Max salesman length')
+        plt.legend()
+        plt.savefig(f"H3_GA/{INSTANCE}/{tt}_hist.png")
+        plt.show()
+        print(f"Best solution in all:\n{best}")
 
     min_fitness_scores, avg_fitness_scores, min_total, avg_total, min_max, avg_max = population.get_population_stats()
     print(f"Final Population stats:\nMin total cost: {min_total:.2f}\nAvg total cost: {avg_total:.2f}")
@@ -309,21 +323,22 @@ def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, mutation_rate, cross
     print(f"Min fitness: {min_fitness_scores:.2f}\nAvg fitness: {avg_fitness_scores:.2f}")
 
 
-
-## git clone https://github.com/mastqe/tsplib
-INSTANCE = 'eil51'
-SALESMEN = 7
-W1, W2 = 0.2, 0.8 # fitness coefs for total cost (1) and min max cost (2)
-POPSIZE = 500
-GENERATIONS = 2500
-MUTATION_RATE = 0.1
-CROSSOVER_RATE = 0.5
 if __name__ == '__main__':
+    ## git clone https://github.com/mastqe/tsplib
+    INSTANCE = 'eil51'
+    SALESMEN = 2
+    W1, W2 = 0.2, 0.8 # fitness coefs for total cost (1) and min max cost (2)
+    POPSIZE = 500
+    MAX_GENERATIONS = 1500
+    SOFT_RESTARTS = 10
+    MUTATION_RATE = 0.1
+    CROSSOVER_RATE = 0.5
     run_ag(
         create_distance_matrix(open(f'H3_GA/tsplib/{INSTANCE}.tsp', 'rt').read()),
         SALESMEN,
         POPSIZE,
-        GENERATIONS,
+        MAX_GENERATIONS,
+        SOFT_RESTARTS,
         MUTATION_RATE,
-        CROSSOVER_RATE
+        CROSSOVER_RATE,
     )

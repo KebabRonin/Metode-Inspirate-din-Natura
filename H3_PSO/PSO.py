@@ -1,54 +1,57 @@
-import numpy as np
-from typing import List, Tuple, Dict
+import numpy as np, tqdm, copy
 import math
 import random
 import matplotlib.pyplot as plt
 
 
-def parse_tsp_file(data: str) -> Dict[int, Tuple[float, float]]:
-    coordinates = {}
-    lines = data.strip().split('\n')
-    start_idx = lines.index('NODE_COORD_SECTION')
-
-    for line in lines[start_idx + 1:]:
-        if line == 'EOF':
+def create_distance_matrix(tsp_content):
+    global COORDS
+    coords = []
+    lines = tsp_content.strip().split('\n')
+    for line in lines:
+        if line.strip() == 'NODE_COORD_SECTION':
+            continue
+        if line.strip() == 'EOF':
             break
-        node_id, x, y = map(float, line.strip().split())
-        coordinates[int(node_id)] = (x, y)
 
-    return coordinates
+        try:
+            node_id, x, y = map(float, line.strip().split())
+            coords.append((x, y))
+        except ValueError:
+            continue
 
+    coords = np.array(coords)
+    COORDS = coords
+    n = len(coords)
 
-def create_distance_matrix(coordinates: Dict[int, Tuple[float, float]]) -> np.ndarray:
-    n = len(coordinates)
-    distances = np.zeros((n, n))
+    # Create distance matrix
+    dist_matrix = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                dist_matrix[i][j] = np.inf
+            else:
+                # Euclidean distance
+                dx = coords[i][0] - coords[j][0]
+                dy = coords[i][1] - coords[j][1]
+                dist_matrix[i][j] = np.sqrt(dx*dx + dy*dy)
 
-    for i in range(1, n + 1):
-        for j in range(1, n + 1):
-            if i != j:
-                x1, y1 = coordinates[i]
-                x2, y2 = coordinates[j]
-                distances[i - 1][j - 1] = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-
-    return distances
+    return dist_matrix
 
 
 class Particle:
-    def __init__(self, num_cities: int, num_salesmen: int, distances: np.ndarray):
-        self.num_cities = num_cities
+    def __init__(self, num_salesmen: int, distance_matrix: np.ndarray):
+        self.num_cities = distance_matrix.shape[0]
         self.num_salesmen = num_salesmen
-        self.distances = distances
+        self.distance_matrix = distance_matrix
 
-        # Initialize position (solution encoding)
         self.position = self._initialize_position()
-        self.velocity = []  # List of swap operations
+        self.velocity = []  # list of swap operations
         self.personal_best_position = self.position.copy()
-        self.personal_best_fitness = float('inf')
+        self.personal_best_fitness = self.calculate_fitness()[0]
 
-    def _initialize_position(self) -> List:
-        """Initialize a valid position using balanced route assignment"""
-        # Create a random permutation of cities
-        cities = list(range(1, self.num_cities + 1))
+    def _initialize_position(self) -> list:
+        cities = list(range(2, self.num_cities + 1))
         random.shuffle(cities)
 
         # Calculate base route size and remainder
@@ -59,84 +62,78 @@ class Particle:
         position = []
         start_idx = 0
 
-        for i in range(self.num_salesmen):
-            # Calculate route size for this salesman
-            route_size = base_size + (1 if i < remainder else 0)
-            # Add cities for this route
+        for i in range(self.num_salesmen - 1):
+            route_size = base_size + int(i < remainder)
             position.extend(cities[start_idx:start_idx + route_size])
             start_idx += route_size
-            # Add delimiter if not last route
-            if i < self.num_salesmen - 1:
-                position.append(0)
+            position.append(0)
+        position.extend(cities[start_idx:])
 
         return position
 
-    def evaluate_fitness(self) -> float:
-        routes = self._get_routes()
-        total_distance = 0
-        route_distances = []
+    def is_valid(self):
+        routes =  self._get_routes()
+        if len(routes) != self.num_salesmen:
+            return False
 
+        used_cities = []
         for route in routes:
-            route_distance = 0
-            route_distance += self.distances[0][route[0] - 1]
+            if route[0] != 1 or route[-1] != 1:
+                return False
+            used_cities.extend(route[1:-1])
 
-            for i in range(len(route) - 1):
-                route_distance += self.distances[route[i] - 1][route[i + 1] - 1]
+        used_cities.sort()
+        expected_cities = sorted(c for c in range(1, self.num_cities + 1) if c != 1)
+        return used_cities == expected_cities
 
-            route_distance += self.distances[route[-1] - 1][0]
+    def calculate_tour_cost(self, tour: list[int]) -> float:
+        cost = 0
+        for i in range(len(tour) - 1):
+            cost += self.distance_matrix[tour[i]-1][tour[i + 1]-1]
+        return cost
 
-            total_distance += route_distance
-            route_distances.append(route_distance)
+    def calculate_fitness(self) -> float:
+        global W1, W2
+        """
+        w1: weight for total cost
+        w2: weight for maximum tour cost
+        """
+        tour_costs = [self.calculate_tour_cost(route) for route in self._get_routes()]
+        total_cost = sum(tour_costs)
+        max_cost = max(tour_costs)
 
-        balance_penalty = np.std(route_distances) if route_distances else 0
-        return total_distance + 0.5 * balance_penalty
+        avg_cost = total_cost / self.num_salesmen
 
-    def _get_routes(self) -> List[List[int]]:
+        # Weighted sum of objectives
+        fitness_score = W1 * avg_cost + W2 * max_cost
+
+        return fitness_score, total_cost, max_cost
+
+    def _get_routes(self) -> list[list[int]]:
         routes = []
-        current_route = []
+        current_route = [1]
 
         for city in self.position:
             if city == 0:
                 if current_route:
-                    routes.append(current_route)
-                current_route = []
+                    routes.append(current_route + [1])
+                current_route = [1]
             else:
                 current_route.append(city)
 
         if current_route:
-            routes.append(current_route)
+            routes.append(current_route + [1])
 
         return routes
 
-    def update_velocity(self, global_best_position: List, w: float, c1: float, c2: float):
-        self.velocity = []
-
-        # Personal influence - with probability c1
-        if random.random() < c1:
-            swaps = self._get_valid_swaps(self.position, self.personal_best_position)
-            if swaps:
-                self.velocity.extend(random.sample(swaps, k=min(2, len(swaps))))
-
-        # Global influence - with probability c2
-        if random.random() < c2:
-            swaps = self._get_valid_swaps(self.position, global_best_position)
-            if swaps:
-                self.velocity.extend(random.sample(swaps, k=min(2, len(swaps))))
-
-        # Inertia - random valid swaps
-        if random.random() < w:
-            valid_swaps = self._get_random_valid_swaps()
-            if valid_swaps:
-                self.velocity.extend(random.sample(valid_swaps, k=min(2, len(valid_swaps))))
-
-    def _get_valid_swaps(self, current: List, target: List) -> List[Tuple[int, int]]:
+    def _get_valid_swaps(self, current: list, target: list) -> list[tuple[int, int]]:
         """Generate valid swaps that move current solution towards target"""
         valid_swaps = []
 
         # Find positions where elements differ
         for i in range(len(current)):
             for j in range(i + 1, len(current)):
-                # Only consider swaps between cities (non-zero elements)
+                # # Only consider swaps between cities (non-zero elements)
                 if current[i] != 0 and current[j] != 0:
                     # Check if swap would move towards target
                     if (current[i] != target[i] and current[j] != target[j] and
@@ -145,9 +142,10 @@ class Particle:
 
         return valid_swaps
 
-    def _get_random_valid_swaps(self) -> List[Tuple[int, int]]:
-        """Generate random valid swaps between cities (non-delimiter elements)"""
-        valid_swaps = []
+    def _get_random_valid_swaps(self) -> list[tuple[int, int]]:
+        # global SWAAPS
+        # if SWAAPS is None:
+        #     SWAAPS = [(i, j) for i in range(len(self.position)) for j in range(i+1, len(self.position))]
 
         # Get positions of cities (non-zero elements)
         city_positions = [i for i, x in enumerate(self.position) if x != 0]
@@ -158,37 +156,69 @@ class Particle:
 
         return valid_swaps
 
+    def update_velocity(self, global_best_position: list, w: float, c1: float, c2: float):
+        self.velocity = []
+        SIGMO = 2
+
+        # Cognitive c1
+        swaps = self._get_valid_swaps(self.position, self.personal_best_position)
+        swap_count = np.clip(int(random.gauss(mu=c1, sigma=SIGMO)), 0, len(swaps))
+        if swaps:
+            self.velocity.extend(random.sample(swaps, k=max(len(swaps), swap_count)))
+
+        # Social c2
+        swaps = self._get_valid_swaps(self.position, global_best_position)
+        swap_count = np.clip(int(random.gauss(mu=c2, sigma=SIGMO)), 0, len(swaps))
+        if swaps:
+            self.velocity.extend(random.sample(swaps, k=swap_count))
+
+        # Inertia - random swaps
+        swap_count = max(0, int(random.gauss(mu=w, sigma=SIGMO)))
+        swaps = self._get_random_valid_swaps()
+        if swaps:
+            self.velocity.extend(random.sample(swaps, k=swap_count))
+
     def update_position(self):
         """Apply velocity (swap sequence) to current position"""
         for i, j in self.velocity:
             self.position[i], self.position[j] = self.position[j], self.position[i]
 
-
+SWAAPS = None
 class MTSPPSO:
-    def __init__(self, num_cities: int, num_salesmen: int, distances: np.ndarray,
+    def __init__(self, num_salesmen: int, distances: np.ndarray,
                  num_particles: int = 50, max_iterations: int = 1000):
-        self.num_cities = num_cities
+        self.num_cities = distances.shape[0]
         self.num_salesmen = num_salesmen
         self.distances = distances
         self.num_particles = num_particles
         self.max_iterations = max_iterations
 
-        self.particles = [Particle(num_cities, num_salesmen, distances)
+        self.particles = [Particle(num_salesmen, distances)
                           for _ in range(num_particles)]
-
         self.global_best_position = None
         self.global_best_fitness = float('inf')
+
+        for particle in self.particles:
+            fness = particle.calculate_fitness()[0]
+            if fness < self.global_best_fitness:
+                self.global_best_fitness = fness
+                self.global_best_position = particle.position.copy()
+                self.gbest_particle = copy.deepcopy(particle)
         self.best_fitness_history = []
+        self.gbest_particle = None
 
-    def optimize(self) -> Tuple[List, float]:
-        w_start, w_end = 0.6, 0.4
-        c1, c2 = 2.5, 2.5
-
-        for iteration in range(self.max_iterations):
-            w = w_start - (w_start - w_end) * iteration / self.max_iterations
+    def optimize(self) -> tuple[Particle, float]:
+        w_start, w_end = 10, 5
+        c1_start, c1_end = 8, 4
+        c2_start, c2_end = 3, 4
+        pbar = tqdm.trange(self.max_iterations)
+        for iteration in pbar:
+            w  =  w_start - ( w_start -  w_end) * iteration / self.max_iterations
+            c1 = c1_start - (c1_start - c1_end) * iteration / self.max_iterations
+            c2 = c2_start - (c2_start - c2_end) * iteration / self.max_iterations
 
             for particle in self.particles:
-                fitness = particle.evaluate_fitness()
+                fitness = particle.calculate_fitness()[0]
 
                 if fitness < particle.personal_best_fitness:
                     particle.personal_best_position = particle.position.copy()
@@ -196,6 +226,8 @@ class MTSPPSO:
 
                 if fitness < self.global_best_fitness:
                     self.global_best_position = particle.position.copy()
+                    self.gbest_particle = copy.deepcopy(particle)
+                    plot_sol(self.gbest_particle._get_routes())
                     self.global_best_fitness = fitness
 
             self.best_fitness_history.append(self.global_best_fitness)
@@ -203,156 +235,62 @@ class MTSPPSO:
             for particle in self.particles:
                 particle.update_velocity(self.global_best_position, w, c1, c2)
                 particle.update_position()
+                if not particle.is_valid():
+                    raise Exception("oops")
 
-            if iteration % 100 == 0:
-                print(f"Iteration {iteration}: Best fitness = {self.global_best_fitness:.2f}")
+            pbar.set_postfix_str(f"Best fitness = {self.global_best_fitness:.5f}")
 
-        return self.global_best_position, self.global_best_fitness
+        return self.gbest_particle, self.global_best_fitness
 
 
-def plot_routes(coordinates: Dict[int, Tuple[float, float]], routes: List[List[int]]):
-    """Plot the routes for each salesman"""
-    plt.figure(figsize=(12, 8))
-
-    # Plot depot (city 1) as a special marker
-    depot_x, depot_y = coordinates[1]
-    plt.plot(depot_x, depot_y, 'k*', markersize=15, label='Depot')
-
-    # Define colors for different salesmen
-    colors = ['b', 'r', 'g', 'm', 'c', 'y']
-
-    # Plot routes for each salesman
-    for i, route in enumerate(routes):
+def plot_sol(best):
+    colors = ['b', 'r', 'g', 'm', 'c', 'y', 'k']
+    plt.cla()
+    plt.scatter(list(map(lambda x: x[0], COORDS)), list(map(lambda x: x[1], COORDS)))
+    for i, tour in enumerate(best):
         color = colors[i % len(colors)]
-
-        # Plot route
-        route_coords = [(depot_x, depot_y)]  # Start at depot
-        for city in route:
-            x, y = coordinates[city]
-            route_coords.append((x, y))
-        route_coords.append((depot_x, depot_y))  # Return to depot
-
-        # Convert coordinates to arrays for plotting
-        x_coords, y_coords = zip(*route_coords)
-        plt.plot(x_coords, y_coords, color=color, linewidth=1, alpha=0.7,
+        plt.plot(list(map(lambda x: COORDS[x-1][0], tour)), list(map(lambda x: COORDS[x-1][1], tour)),
+                 color=color,
                  label=f'Salesman {i + 1}')
+    plt.pause(0.05)
 
-        # Plot cities on the route
-        for city in route:
-            x, y = coordinates[city]
-            plt.plot(x, y, 'o', color=color, markersize=8)
-            plt.annotate(str(city), (x, y), xytext=(5, 5), textcoords='offset points')
-
-    plt.title('MTSP Routes Visualization')
-    plt.xlabel('X Coordinate')
-    plt.ylabel('Y Coordinate')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.show()
-
-
-def solve_eil51_mtsp(tsp_data: str, num_salesmen: int = 2):
-    coordinates = parse_tsp_file(tsp_data)
-    distances = create_distance_matrix(coordinates)
-
+def pso_mtsp(distances: str, num_salesmen: int, particles, iterations):
     pso = MTSPPSO(
-        num_cities=51,
         num_salesmen=num_salesmen,
         distances=distances,
-        num_particles=200,
-        max_iterations=3000
+        num_particles=particles,
+        max_iterations=iterations
     )
 
     best_solution, best_fitness = pso.optimize()
 
-    routes = []
-    current_route = []
-    for city in best_solution:
-        if city == 0:
-            routes.append(current_route)
-            current_route = []
-        else:
-            current_route.append(city)
-    routes.append(current_route)
-
     print("\nFinal Solution:")
-    print(f"Total fitness (distance + balance penalty): {best_fitness:.2f}")
+    print(f"Total fitness: {best_fitness:.2f}")
     print("\nRoutes:")
-    for i, route in enumerate(routes):
-        route_distance = 0
-        if route:
-            route_distance += distances[0][route[0] - 1]
-            for j in range(len(route) - 1):
-                route_distance += distances[route[j] - 1][route[j + 1] - 1]
-            route_distance += distances[route[-1] - 1][0]
 
-        print(f"Salesman {i + 1}: Depot -> {' -> '.join(map(str, route))} -> Depot")
-        print(f"Route distance: {route_distance:.2f}")
+    fitness_score, total_cost, max_cost = best_solution.calculate_fitness()
+    output = ""
+    routes = best_solution._get_routes()
+    for tour in routes:
+        output += f"  {tour},\n"
+    print(f"Fitness Score: {fitness_score:.2f}, Total Cost: {total_cost:.2f}, Max Tour Cost: {max_cost:.2f}||")
+    print(" ".join([f"{best_solution.calculate_tour_cost(tour):.4f}" for tour in routes]))
+    print(f"[\n{output}]")
 
-    # Plot the routes
-    plot_routes(coordinates, routes)
+    plot_sol(routes)
+    plt.show()
 
     return best_solution, best_fitness, routes
 
 
 if __name__ == "__main__":
-    tsp_data = """NAME : eil51
-COMMENT : 51-city problem (Christofides/Eilon)
-TYPE : TSP
-DIMENSION : 51
-EDGE_WEIGHT_TYPE : EUC_2D
-NODE_COORD_SECTION
-1 37 52
-2 49 49
-3 52 64
-4 20 26
-5 40 30
-6 21 47
-7 17 63
-8 31 62
-9 52 33
-10 51 21
-11 42 41
-12 31 32
-13 5 25
-14 12 42
-15 36 16
-16 52 41
-17 27 23
-18 17 33
-19 13 13
-20 57 58
-21 62 42
-22 42 57
-23 16 57
-24 8 52
-25 7 38
-26 27 68
-27 30 48
-28 43 67
-29 58 48
-30 58 27
-31 37 69
-32 38 46
-33 46 10
-34 61 33
-35 62 63
-36 63 69
-37 32 22
-38 45 35
-39 59 15
-40 5 6
-41 10 17
-42 21 10
-43 5 64
-44 30 15
-45 39 10
-46 32 39
-47 25 32
-48 25 55
-49 48 28
-50 56 37
-51 30 40
-EOF"""
-
-    best_solution, best_fitness, routes = solve_eil51_mtsp(tsp_data, num_salesmen=2)
+    ## git clone https://github.com/mastqe/tsplib
+    INSTANCE = 'eil51'
+    SALESMEN = 2
+    W1, W2 = 0.8, 0.2 # fitness coefs for total cost (1) and min max cost (2)
+    distance_matrix = create_distance_matrix(open(f"H3_GA/tsplib/{INSTANCE}.tsp",'rt').read())
+    pso_mtsp(distance_matrix, 
+        num_salesmen=SALESMEN, 
+        particles=1500, 
+        iterations=1500
+    )
