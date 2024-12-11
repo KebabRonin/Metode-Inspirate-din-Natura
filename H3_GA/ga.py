@@ -80,7 +80,8 @@ class MTSPIndividual:
         expected_cities = sorted(c for c in range(1, self.n_cities + 1) if c != self.depot)
         return used_cities == expected_cities
 
-    def calculate_fitness(self, w1=0.5, w2=0.5) -> float:
+    def calculate_fitness(self) -> float:
+        global W1, W2
         """
         w1: weight for total cost
         w2: weight for maximum tour cost
@@ -92,7 +93,7 @@ class MTSPIndividual:
         avg_cost = total_cost / len(self.chromosomes)
 
         # Weighted sum of objectives
-        fitness_score = w1 * avg_cost + w2 * max_cost
+        fitness_score = W1 * avg_cost + W2 * max_cost
 
         return fitness_score, total_cost, max_cost
 
@@ -102,10 +103,12 @@ class MTSPIndividual:
 
     def __str__(self) -> str:
         fitness_score, total_cost, max_cost = self.calculate_fitness()
-        output = f"Fitness Score: {fitness_score:.2f}, Total Cost: {total_cost:.2f}, Max Tour Cost: {max_cost:.2f}\n"
+        output = ""
         for i, tour in enumerate(self.chromosomes):
-            output += f"Salesman {i+1}: {tour}\n"
-        return output
+            output += f"  {tour},\n"
+        return f"Fitness Score: {fitness_score:.2f}, Total Cost: {total_cost:.2f}, Max Tour Cost: {max_cost:.2f}" + \
+            f" ({list(map(lambda x: self.calculate_tour_cost(x), self.chromosomes))}) "+\
+            f"[\n{output}]"
 
     def in_route_mutation(self, mutation_rate: float) -> None:
         if random.random() > mutation_rate:
@@ -117,12 +120,13 @@ class MTSPIndividual:
         if len(chromosome) < 4:
             return
         start = random.randint(1, len(chromosome) - 3)
-        leng = random.sample(list(range(2, len(chromosome) - start)), 1)[0]
+        leng = random.randint(2, len(chromosome) - 1 - start)
 
         # Invert subsection
         self.chromosomes[chromosome_idx][start:start + leng] = \
             self.chromosomes[chromosome_idx][start:start + leng][::-1]
-    
+        return
+
     def cross_route_mutation(self, mutation_rate: float):
         """Move a city to another salesman"""
         if random.random() > mutation_rate:
@@ -133,6 +137,7 @@ class MTSPIndividual:
             return
         cutoff = random.randint(1, len(self.chromosomes[s1][1:-1]))
         self.chromosomes[s2].insert(-1, self.chromosomes[s1].pop(cutoff))
+        return
 
     def mutation(self, mutation_rate: float):
         if random.random() > 0.5:
@@ -182,15 +187,15 @@ class MTSPPopulation:
             p2_route = parent2.chromosomes[salesman_idx]
             route_length = len(p1_route)
 
-            start = random.randint(1, route_length - 4)
-            end = random.randint(start, route_length - 2)
+            start = random.randint(1, route_length - 2)
+            end = random.randint(start, route_length)
 
             offspring_route = [-1] * route_length
             offspring_route[0] = offspring_route[-1] = self.depot
 
-            offspring_route[start:end + 1] = p1_route[start:end + 1]
+            offspring_route[start:end] = p1_route[start:end]
 
-            used_cities = set(offspring_route[start:end + 1])
+            used_cities = set(offspring_route[start:end])
             remaining_cities = [city for city in p2_route
                               if city not in used_cities and city != self.depot]
             try:
@@ -199,7 +204,7 @@ class MTSPPopulation:
                     offspring_route[i] = remaining_cities[idx]
                     idx += 1
 
-                for i in range(end + 1, route_length - 1):
+                for i in range(end, route_length - 1):
                     offspring_route[i] = remaining_cities[idx]
                     idx += 1
             except IndexError:
@@ -221,13 +226,13 @@ class MTSPPopulation:
             elif len(city_positions[city]) < 1:
                 # Change this?
                 salesman_idx = random.randint(0, self.n_salesmen - 1)
-                city_position = random.randint(1, len(offspring.chromosomes[salesman_idx]) - 2)
+                city_position = random.randint(1, len(offspring.chromosomes[salesman_idx]) - 1)
                 offspring.chromosomes[salesman_idx].insert(city_position, city)
                 city_positions = {city: [(salesman_idx, i) for salesman_idx, salesman_tour in enumerate(offspring.chromosomes) for i, tcity in enumerate(salesman_tour) if tcity == city] for city in range(1, len(self.distance_matrix) + 1) if city != self.depot}
         return offspring
 
     def breed_new_population(self, tournament_size: int, crossover_rate: float) -> list[MTSPIndividual]:
-        new_solutions = [self.tournament_selection(tournament_size) for _ in range(int(self.pop_size*crossover_rate))]
+        new_solutions = [self.tournament_selection(tournament_size) for _ in range(int(self.pop_size*(1-crossover_rate)))]
         while len(new_solutions) < self.pop_size:
             parent1 = self.tournament_selection(tournament_size)
             parent2 = self.tournament_selection(tournament_size)
@@ -255,6 +260,7 @@ def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, mutation_rate, cross
     population = MTSPPopulation(distance_matrix, n_salesmen=n_salesmen, pop_size=pop_size)
     pbar = tqdm.trange(max_gens, desc="AG generations", position=0)
     hist = []
+    restarts = 10
     mrate = mutation_rate
     crate = crossover_rate
     best = copy.deepcopy(population.get_best_solution())
@@ -262,31 +268,38 @@ def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, mutation_rate, cross
     for t in pbar:
         # Crossover + Selection
         population.solutions = population.breed_new_population(tournament_size=10, crossover_rate=crate)
+        if not np.all([sol.is_valid() for sol in population.solutions]):
+            raise Exception("Bad crossover")
         # Mutation
         [sol.mutation(mrate) for sol in population.solutions]
+        if not np.all([sol.is_valid() for sol in population.solutions]):
+            raise Exception("Bad mutation")
         if population.get_best_solution().calculate_fitness()[1] < best.calculate_fitness()[1]:
             best = copy.deepcopy(population.get_best_solution())
             plot_sol(best)
         hist.append(population.get_best_solution().calculate_fitness()[1])
-        if t - liter > 20 and np.var(hist[-20:]) < 5:
-            print(mrate, crate)
-            mrate = 1
-            crate = 0.9
+        if t - liter > 30 and np.var(hist[-30:]) < 5:
+            # print(mrate, crate)
+            mrate = 0.9
+            crate = 0.1
             liter = t
+            restarts -= 1
+            if restarts <= 0:
+                break
         else:
             if mrate > mutation_rate:
                 mrate *= 0.95
                 if mrate < mutation_rate:
                     mrate = mutation_rate
-            if crate > crossover_rate:
-                crate *= 0.95
-                if crate < crossover_rate:
+            if crate < crossover_rate:
+                crate *= 1.1
+                if crate > crossover_rate:
                     crate = crossover_rate
-        pbar.set_postfix_str(f"Best solution: {population.get_best_solution().calculate_fitness()[1]:.5f}")
-    plt.savefig(f"{INSTANCE}_{time.time()}_{POPSIZE}pop_path.png")
+        pbar.set_postfix_str(f"[{restarts}] Best solution: {population.get_best_solution().calculate_fitness()[1]:.5f}")
+    # plt.savefig(f"{INSTANCE}_{time.time()}_{POPSIZE}pop_path.png")
     plt.show()
     plt.plot(hist)
-    plt.savefig(f"{time.time()}_hist.png")
+    # plt.savefig(f"{time.time()}_hist.png")
     plt.show()
     print(f"Best solution in all:\n{best}")
 
@@ -299,16 +312,18 @@ def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, mutation_rate, cross
 
 ## git clone https://github.com/mastqe/tsplib
 INSTANCE = 'eil51'
-SALESMEN = 2
+SALESMEN = 7
+W1, W2 = 0.2, 0.8 # fitness coefs for total cost (1) and min max cost (2)
 POPSIZE = 500
-GENERATIONS = 1500
+GENERATIONS = 2500
 MUTATION_RATE = 0.1
 CROSSOVER_RATE = 0.5
-run_ag(
-    create_distance_matrix(open(f'H3_GA/tsplib/{INSTANCE}.tsp', 'rt').read()),
-    SALESMEN,
-    POPSIZE,
-    GENERATIONS,
-    MUTATION_RATE,
-    CROSSOVER_RATE
-)
+if __name__ == '__main__':
+    run_ag(
+        create_distance_matrix(open(f'H3_GA/tsplib/{INSTANCE}.tsp', 'rt').read()),
+        SALESMEN,
+        POPSIZE,
+        GENERATIONS,
+        MUTATION_RATE,
+        CROSSOVER_RATE
+    )
