@@ -79,14 +79,15 @@ def get_valid_swaps(source, target):
             current = target_positions[current]
 
         # Generate the swaps for this cycle
+        scopy = copy.deepcopy(source)
         for i in range(len(cycle) - 1):
             pos1 = cycle[i]
             pos2 = cycle[i + 1]
             # Record the values that need to be swapped
-            swaps.append((source[pos1], source[pos2]))
+            swaps.append((scopy[pos1], scopy[pos2]))
 
             # Update source to reflect the swap
-            source[pos1], source[pos2] = source[pos2], source[pos1]
+            scopy[pos1], scopy[pos2] = scopy[pos2], scopy[pos1]
 
     return swaps
 
@@ -134,7 +135,9 @@ class Particle:
         routes = self._get_routes()
         if len(routes) != self.num_salesmen:
             return False
-
+        for route in routes:
+            if len(route) <= 2:
+                return False
         used_cities = []
         for route in routes:
             if route[0] != 1 or route[-1] != 1:
@@ -204,8 +207,6 @@ class Particle:
 
         return valid_swaps
 
-
-
     def update_velocity(self, global_best_position, w, c1, c2):
 
         velocity_swaps = []
@@ -253,9 +254,25 @@ class Particle:
 
     def update_position(self):
         """Apply velocity (swap sequence) to current position"""
+        def was_ok_move(i, l):
+            if l[i] == 0:
+                if i == 0 or i == len(l) - 1 or l[i - 1] == 0 or l[i + 1] == 0:
+                    return False
+            return True
+        # pp = copy.deepcopy(self.position)
         for i, j in self.velocity:
             self.position[i], self.position[j] = self.position[j], self.position[i]
+            if not (was_ok_move(i, self.position) and was_ok_move(j, self.position)):
+                self.position[i], self.position[j] = self.position[j], self.position[i]
 
+        # pass
+
+        # for i, j in self.velocity:
+        #     pp[i], pp[j] = pp[j], pp[i]
+        #     if not (was_ok_move(i, pp) and was_ok_move(j, pp)):
+        #         pp[i], pp[j] = pp[j], pp[i]
+
+        return
 
 class MTSPPSO:
     def __init__(self, num_salesmen, distances,
@@ -269,6 +286,7 @@ class MTSPPSO:
         self.particles = [Particle(num_salesmen, distances)
                           for _ in range(num_particles)]
         self.global_best_position = None
+        self.gbest_particle = None
         self.global_best_fitness = float('inf')
 
         for particle in self.particles:
@@ -278,13 +296,15 @@ class MTSPPSO:
                 self.global_best_position = particle.position.copy()
                 self.gbest_particle = copy.deepcopy(particle)
         self.best_fitness_history = []
-        self.gbest_particle = None
 
     def optimize(self):
-        w_start, w_end = 10, 20
-        c1_start, c1_end = 5, 10
-        c2_start, c2_end = 5, 22
+        w_start, w_end = 100, 1
+        c1_start, c1_end = 5, 1
+        c2_start, c2_end = 5, 1
         pbar = tqdm.trange(self.max_iterations)
+        besst = self.gbest_particle.calculate_fitness()
+        fitnesses = [p.calculate_fitness()[0] for p in self.particles]
+        pbar.set_postfix_str(f"Fit:{besst[0]:>10.5f}|Total:{besst[1]:>10.5f}|Max:{besst[2]:>10.5f}|Var:{np.var(fitnesses):>10.5f}")
         for iteration in pbar:
             w = w_start - (w_start - w_end) * iteration / self.max_iterations
             c1 = c1_start - (c1_start - c1_end) * iteration / self.max_iterations
@@ -311,10 +331,6 @@ class MTSPPSO:
             for particle in self.particles:
                 particle.update_velocity(self.global_best_position, w, c1, c2)
                 particle.update_position()
-                if not particle.is_valid():
-                    raise Exception("oops")
-
-
 
         return self.gbest_particle, self.global_best_fitness
 
