@@ -1,4 +1,4 @@
-import numpy as np, random, tqdm, copy, time, os, json, itertools
+import numpy as np, random, tqdm, copy, time, os, json, itertools, math
 import matplotlib.pyplot as plt
 from threading import Thread
 COORDS = None
@@ -45,6 +45,39 @@ class MTSPIndividual:
         self.n_salesmen = n_salesmen
         self.depot = depot
         self.chromosomes: list[list[int]] = []
+
+    def initialize_smart(self):
+        # Sort the cities by angle from the depot
+        depot_coords = COORDS[self.depot - 1]
+        cities = list(filter(lambda i: i != (self.depot - 1), range(0, self.n_cities)))
+        angles = [(c, (np.pi) + np.arctan2((depot_coords[0] - COORDS[c][0]), (depot_coords[1] - COORDS[c][1]))) for c in cities]
+        angles.sort(key=lambda x: x[1])
+        # Then divide the cities into n_salesmen groups
+        group_start_angle_delims = [x[1] for x in random.sample(angles, self.n_salesmen)]
+        group_start_angle_delims.sort()
+        for s in range(self.n_salesmen-1):
+            #V2: each group gets fixed degrees
+            start_angle = group_start_angle_delims[s]
+            end_angle = group_start_angle_delims[s + 1]
+            group_cities = list(filter(lambda x: start_angle <= x[1] < end_angle, angles))
+            random.shuffle(group_cities)
+            self.chromosomes.append([self.depot] + [(c[0] + 1) for c in group_cities] + [self.depot])
+        start_angle = group_start_angle_delims[-1]
+        end_angle = group_start_angle_delims[0]
+        group_cities = list(filter(lambda x: not (end_angle <= x[1] < start_angle), angles))
+        random.shuffle(group_cities)
+        self.chromosomes.append([self.depot] + [(c[0] + 1) for c in group_cities] + [self.depot])
+        # # V1: each group gets equal number of cities
+        # gs = np.split(angles, self.n_salesmen)
+        # self.chromosomes = [
+        #     [self.depot] + [(c[0] + 1) for c in gs[i]] + [self.depot]
+        #     for i in range(self.n_salesmen)
+        # ]
+        # Groups should be equalish?
+        if not self.is_valid():
+            raise Exception("Invalid initialization")
+        # print(group_start_angle_delims)
+        # plot_sol(self)
 
     def initialize_random(self) -> None:
         cities = list(range(1, self.n_cities + 1))
@@ -141,7 +174,7 @@ class MTSPIndividual:
         return
 
     def mutation(self, mutation_rate: float):
-        if random.random() > 0.5:
+        if random.random() < 0.5:
             self.in_route_mutation(mutation_rate)
         else:
             self.cross_route_mutation(mutation_rate)
@@ -158,7 +191,7 @@ class MTSPPopulation:
     def initialize_population(self) -> None:
         for _ in range(self.pop_size):
             solution = MTSPIndividual(self.distance_matrix, self.n_salesmen, self.depot)
-            solution.initialize_random()
+            solution.initialize_smart()
             self.solutions.append(solution)
 
     def get_best_solution(self) -> MTSPIndividual:
@@ -287,7 +320,7 @@ def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, soft_restart_count, 
         if population.get_best_solution().calculate_fitness()[0] < best.calculate_fitness()[0]:
             best = copy.deepcopy(population.get_best_solution())
             # if draw_plot:
-            #     plot_sol(best)
+            # plot_sol(best)
         hist.append(population.get_best_solution().calculate_fitness())
         if t - liter > 50 and np.var(list(map(lambda x: x[0], hist[-50:]))) < 5:
             # print(mrate, crate)
@@ -312,7 +345,6 @@ def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, soft_restart_count, 
 
     if result:
         result[name] = (copy.deepcopy(best), copy.deepcopy(hist))
-    return best, population
 
 
 
@@ -342,8 +374,8 @@ if __name__ == '__main__':
     INSTANCE = 'eil51'
     SALESMEN = 2
     W1, W2 = 0.8, 0.2 # fitness coefs for total cost (1) and min max cost (2)
-    POPSIZE = 700
-    T_SIZE = 5
+    POPSIZE = 500
+    T_SIZE = 10
     MAX_GENERATIONS = 2500
     SOFT_RESTARTS = 10
     INSULE = 5
@@ -355,7 +387,7 @@ if __name__ == '__main__':
         if not os.path.exists(f"H3_GA/{instance}/{salesmen}/"):
             os.makedirs(f"H3_GA/{instance}/{salesmen}/")
         distance_matrix = create_distance_matrix(open(f'H3_GA/tsplib/{instance}.tsp', 'rt').read())
-        results = [None] * (INSULE)
+        results = [None for _ in range(INSULE)]
         ts = [Thread(target=run_ag, args=(
             distance_matrix,
             salesmen,

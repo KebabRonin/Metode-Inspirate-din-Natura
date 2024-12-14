@@ -42,6 +42,7 @@ def create_distance_matrix(tsp_content):
 
 
 def get_valid_swaps(source, target):
+
     if len(source) != len(target) or sorted(source) != sorted(target):
         raise ValueError("Lists must be the same length and contain the same elements")
 
@@ -100,25 +101,32 @@ class Particle:
         self.velocity = []  # list of swap operations
         self.personal_best_position = self.position.copy()
         self.personal_best_fitness, _, _ = self.calculate_fitness()
+        if not self.is_valid():
+            raise Exception("Invalid initial position")
 
     def _initialize_position(self) -> list:
-        cities = list(range(2, self.num_cities + 1))
-        random.shuffle(cities)
-
-        # Calculate base route size and remainder
-        base_size = self.num_cities // self.num_salesmen
-        remainder = self.num_cities % self.num_salesmen
-
-        # Create position with delimiters
         position = []
-        start_idx = 0
 
-        for i in range(self.num_salesmen - 1):
-            route_size = base_size + int(i < remainder)
-            position.extend(cities[start_idx:start_idx + route_size])
-            start_idx += route_size
-            position.append(0)
-        position.extend(cities[start_idx:])
+        # Sort the cities by angle from the depot
+        depot_coords = COORDS[0]
+        cities = list(range(1, self.num_cities))
+        angles = [(c, (np.pi) + np.arctan2((depot_coords[0] - COORDS[c][0]), (depot_coords[1] - COORDS[c][1]))) for c in cities]
+        angles.sort(key=lambda x: x[1])
+        # Then divide the cities into n_salesmen groups
+        group_start_angle_delims = [x[1] for x in random.sample(angles, self.num_salesmen)]
+        group_start_angle_delims.sort()
+        for s in range(self.num_salesmen-1):
+            #V2: each group gets fixed degrees
+            start_angle = group_start_angle_delims[s]
+            end_angle = group_start_angle_delims[s + 1]
+            group_cities = list(filter(lambda x: start_angle <= x[1] < end_angle, angles))
+            random.shuffle(group_cities)
+            position.extend([(c[0] + 1) for c in group_cities] + [0])
+        start_angle = group_start_angle_delims[-1]
+        end_angle = group_start_angle_delims[0]
+        group_cities = list(filter(lambda x: not (end_angle <= x[1] < start_angle), angles))
+        random.shuffle(group_cities)
+        position.extend([(c[0] + 1) for c in group_cities])
 
         return position
 
@@ -273,9 +281,9 @@ class MTSPPSO:
         self.gbest_particle = None
 
     def optimize(self):
-        w_start, w_end = 3, 1
-        c1_start, c1_end = 5, 2
-        c2_start, c2_end = 5, 2
+        w_start, w_end = 10, 20
+        c1_start, c1_end = 5, 10
+        c2_start, c2_end = 5, 22
         pbar = tqdm.trange(self.max_iterations)
         for iteration in pbar:
             w = w_start - (w_start - w_end) * iteration / self.max_iterations
@@ -294,6 +302,9 @@ class MTSPPSO:
                     self.gbest_particle = copy.deepcopy(particle)
                     plot_sol(self.gbest_particle._get_routes())
                     self.global_best_fitness = fitness
+                    besst = self.gbest_particle.calculate_fitness()
+                    fitnesses = [p.calculate_fitness()[0] for p in self.particles]
+                    pbar.set_postfix_str(f"Fit:{besst[0]:>10.5f}|Total:{besst[1]:>10.5f}|Max:{besst[2]:>10.5f}|Var:{np.var(fitnesses):>10.5f}")
 
             self.best_fitness_history.append(self.global_best_fitness)
 
@@ -303,7 +314,7 @@ class MTSPPSO:
                 if not particle.is_valid():
                     raise Exception("oops")
 
-            pbar.set_postfix_str(f"Best fitness = {self.global_best_fitness:.5f}")
+
 
         return self.gbest_particle, self.global_best_fitness
 
@@ -350,7 +361,7 @@ def pso_mtsp(distances, num_salesmen, particles, iterations):
 
 
 if __name__ == "__main__":
-    distance_matrix = create_distance_matrix(open(r"D:\Facultate\tsplib\eil51.tsp", 'rt').read())
+    distance_matrix = create_distance_matrix(open(r"H3_GA\tsplib\eil51.tsp", 'rt').read())
     pso_mtsp(distance_matrix,
              num_salesmen=2,
              particles=500,
