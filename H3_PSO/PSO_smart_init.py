@@ -84,7 +84,7 @@ def get_valid_swaps(source, target):
             pos1 = cycle[i]
             pos2 = cycle[i + 1]
             # Record the values that need to be swapped
-            swaps.append((scopy[pos1], scopy[pos2]))
+            swaps.append((pos1, pos2))
 
             # Update source to reflect the swap
             scopy[pos1], scopy[pos2] = scopy[pos2], scopy[pos1]
@@ -209,7 +209,7 @@ class Particle:
 
     def update_velocity(self, global_best_position, w, c1, c2):
 
-        velocity_swaps = []
+        self.velocity = []
 
         sigma = 2
 
@@ -221,7 +221,7 @@ class Particle:
             ))
             idxs = random.sample(range(len(cognitive_swaps)), k=cognitive_count)
             idxs.sort()
-            velocity_swaps.extend(
+            self.velocity.extend(
                 [cognitive_swaps[idx] for idx in idxs]
             )
 
@@ -234,7 +234,7 @@ class Particle:
             ))
             idxs = random.sample(range(len(social_swaps)), k=social_count)
             idxs.sort()
-            velocity_swaps.extend(
+            self.velocity.extend(
                 [social_swaps[idx] for idx in idxs]
             )
 
@@ -246,11 +246,9 @@ class Particle:
                 int(random.gauss(mu=w, sigma=sigma)),
                 len(random_swaps)
             ))
-            velocity_swaps.extend(
+            self.velocity.extend(
                 random.sample(random_swaps, k=random_count)
             )
-
-        return velocity_swaps
 
     def update_position(self):
         """Apply velocity (swap sequence) to current position"""
@@ -298,9 +296,9 @@ class MTSPPSO:
         self.best_fitness_history = []
 
     def optimize(self):
-        w_start, w_end = 100, 1
-        c1_start, c1_end = 5, 1
-        c2_start, c2_end = 5, 1
+        w_start, w_end = 3, 1
+        c1_start, c1_end = 5, 2
+        c2_start, c2_end = 10, 4
         pbar = tqdm.trange(self.max_iterations)
         besst = self.gbest_particle.calculate_fitness()
         fitnesses = [p.calculate_fitness()[0] for p in self.particles]
@@ -323,8 +321,8 @@ class MTSPPSO:
                     plot_sol(self.gbest_particle._get_routes())
                     self.global_best_fitness = fitness
                     besst = self.gbest_particle.calculate_fitness()
-                    fitnesses = [p.calculate_fitness()[0] for p in self.particles]
-                    pbar.set_postfix_str(f"Fit:{besst[0]:>10.5f}|Total:{besst[1]:>10.5f}|Max:{besst[2]:>10.5f}|Var:{np.var(fitnesses):>10.5f}")
+            fitnesses = [p.calculate_fitness()[0] for p in self.particles]
+            pbar.set_postfix_str(f"Fit:{besst[0]:>10.5f}|Total:{besst[1]:>10.5f}|Max:{besst[2]:>10.5f}|Var:{np.var(fitnesses):>10.5f}")
 
             self.best_fitness_history.append(self.global_best_fitness)
 
