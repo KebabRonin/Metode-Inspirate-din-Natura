@@ -1,7 +1,9 @@
-import numpy as np, tqdm, copy
-import math
 import random
+
+import copy
 import matplotlib.pyplot as plt
+import numpy as np
+import tqdm
 
 
 def create_distance_matrix(tsp_content):
@@ -34,9 +36,59 @@ def create_distance_matrix(tsp_content):
                 # Euclidean distance
                 dx = coords[i][0] - coords[j][0]
                 dy = coords[i][1] - coords[j][1]
-                dist_matrix[i][j] = np.sqrt(dx*dx + dy*dy)
+                dist_matrix[i][j] = np.sqrt(dx * dx + dy * dy)
 
     return dist_matrix
+
+
+def get_valid_swaps(source, target):
+  
+    if len(source) != len(target) or sorted(source) != sorted(target):
+        raise ValueError("Lists must be the same length and contain the same elements")
+
+    n = len(source)
+
+    # Create a mapping of values to their positions in target
+    pos_map = {val: idx for idx, val in enumerate(target)}
+
+    # Create a list that represents where each element needs to move
+    # For each position i, target_positions[i] tells us where the element at
+    # position i in source needs to end up (based on target)
+    target_positions = [pos_map[val] for val in source]
+
+    # Keep track of which positions we've already processed
+    visited = [False] * n
+
+    # Store the swap operations
+    swaps = []
+
+    # Process each position
+    for start in range(n):
+        # Skip if we've already handled this position or
+        # if the element is already in the correct spot
+        if visited[start] or target_positions[start] == start:
+            continue
+
+        # Follow the cycle starting from this position
+        current = start
+        cycle = []
+
+        while not visited[current]:
+            visited[current] = True
+            cycle.append(current)
+            current = target_positions[current]
+
+        # Generate the swaps for this cycle
+        for i in range(len(cycle) - 1):
+            pos1 = cycle[i]
+            pos2 = cycle[i + 1]
+            # Record the values that need to be swapped
+            swaps.append((source[pos1], source[pos2]))
+
+            # Update source to reflect the swap
+            source[pos1], source[pos2] = source[pos2], source[pos1]
+
+    return swaps
 
 
 class Particle:
@@ -48,7 +100,7 @@ class Particle:
         self.position = self._initialize_position()
         self.velocity = []  # list of swap operations
         self.personal_best_position = self.position.copy()
-        self.personal_best_fitness = self.calculate_fitness()[0]
+        self.personal_best_fitness, _, _ = self.calculate_fitness()
 
     def _initialize_position(self) -> list:
         cities = list(range(2, self.num_cities + 1))
@@ -72,7 +124,7 @@ class Particle:
         return position
 
     def is_valid(self):
-        routes =  self._get_routes()
+        routes = self._get_routes()
         if len(routes) != self.num_salesmen:
             return False
 
@@ -89,23 +141,20 @@ class Particle:
     def calculate_tour_cost(self, tour: list[int]) -> float:
         cost = 0
         for i in range(len(tour) - 1):
-            cost += self.distance_matrix[tour[i]-1][tour[i + 1]-1]
+            cost += self.distance_matrix[tour[i] - 1][tour[i + 1] - 1]
         return cost
 
-    def calculate_fitness(self) -> float:
-        global W1, W2
-        """
-        w1: weight for total cost
-        w2: weight for maximum tour cost
-        """
-        tour_costs = [self.calculate_tour_cost(route) for route in self._get_routes()]
+    def calculate_fitness(self):
+        routes = self._get_routes()
+        tour_costs = [self.calculate_tour_cost(route) for route in routes]
+
+        # Calculate metrics
         total_cost = sum(tour_costs)
-        max_cost = max(tour_costs)
+        max_cost = max(tour_costs)  # This is Q in the formulation
 
-        avg_cost = total_cost / self.num_salesmen
-
-        # Weighted sum of objectives
-        fitness_score = W1 * avg_cost + W2 * max_cost
+        # In the MinMax formulation, our fitness is simply Q (the longest tour)
+        # We don't use weighted averages anymore
+        fitness_score = max_cost
 
         return fitness_score, total_cost, max_cost
 
@@ -126,67 +175,81 @@ class Particle:
 
         return routes
 
-    def _get_valid_swaps(self, current: list, target: list) -> list[tuple[int, int]]:
-        """Generate valid swaps that move current solution towards target"""
-        valid_swaps = []
+    def _get_random_valid_swaps(self):
 
-        # Find positions where elements differ
-        for i in range(len(current)):
-            for j in range(i + 1, len(current)):
-                # # Only consider swaps between cities (non-zero elements)
-                if current[i] != 0 and current[j] != 0:
-                    # Check if swap would move towards target
-                    if (current[i] != target[i] and current[j] != target[j] and
-                            (current[i] == target[j] or current[j] == target[i])):
-                        valid_swaps.append((i, j))
-
-        return valid_swaps
-
-    def _get_random_valid_swaps(self) -> list[tuple[int, int]]:
-        # global SWAAPS
-        # if SWAAPS is None:
-        #     SWAAPS = [(i, j) for i in range(len(self.position)) for j in range(i+1, len(self.position))]
-
-        # Get positions of cities (non-zero elements)
         city_positions = [i for i, x in enumerate(self.position) if x != 0]
 
-        # Generate all possible pairs of city positions
+        # Initialize our results list
+        valid_swaps = []
+
+        # Generate swaps only if we have at least 2 cities
         if len(city_positions) >= 2:
-            valid_swaps = [(i, j) for i in city_positions for j in city_positions if i < j]
+            # For each city position
+            for i in range(len(city_positions)):
+                # Consider swaps with all subsequent city positions
+                for j in range(i + 1, len(city_positions)):
+                    pos1 = city_positions[i]
+                    pos2 = city_positions[j]
+
+                    # Verify that both positions contain actual cities
+                    if self.position[pos1] != 0 and self.position[pos2] != 0:
+                        valid_swaps.append((pos1, pos2))
 
         return valid_swaps
 
-    def update_velocity(self, global_best_position: list, w: float, c1: float, c2: float):
-        self.velocity = []
-        SIGMO = 2
 
-        # Cognitive c1
-        swaps = self._get_valid_swaps(self.position, self.personal_best_position)
-        swap_count = np.clip(int(random.gauss(mu=c1, sigma=SIGMO)), 0, len(swaps))
-        if swaps:
-            self.velocity.extend(random.sample(swaps, k=max(len(swaps), swap_count)))
 
-        # Social c2
-        swaps = self._get_valid_swaps(self.position, global_best_position)
-        swap_count = np.clip(int(random.gauss(mu=c2, sigma=SIGMO)), 0, len(swaps))
-        if swaps:
-            self.velocity.extend(random.sample(swaps, k=swap_count))
+    def update_velocity(self, global_best_position, w, c1, c2):
 
-        # Inertia - random swaps
-        swap_count = max(0, int(random.gauss(mu=w, sigma=SIGMO)))
-        swaps = self._get_random_valid_swaps()
-        if swaps:
-            self.velocity.extend(random.sample(swaps, k=swap_count))
+        velocity_swaps = []
+
+        sigma = 2
+
+        cognitive_swaps = get_valid_swaps(self.position, self.personal_best_position)
+        if cognitive_swaps:
+            cognitive_count = max(0, min(
+                int(random.gauss(mu=c1, sigma=sigma)),
+                len(cognitive_swaps)
+            ))
+
+            velocity_swaps.extend(
+                random.sample(cognitive_swaps, k=cognitive_count)
+            )
+
+        # Next, add swaps that move us toward global best (social component)
+        social_swaps = get_valid_swaps(self.position, global_best_position)
+        if social_swaps:
+            social_count = max(0, min(
+                int(random.gauss(mu=c2, sigma=sigma)),
+                len(social_swaps)
+            ))
+            velocity_swaps.extend(
+                random.sample(social_swaps, k=social_count)
+            )
+
+        # Finally, add random swaps for exploration (inertia component)
+        random_swaps = self._get_random_valid_swaps()
+        if random_swaps:
+            # The inertia weight w determines how many random swaps to include
+            random_count = max(0, min(
+                int(random.gauss(mu=w, sigma=sigma)),
+                len(random_swaps)
+            ))
+            velocity_swaps.extend(
+                random.sample(random_swaps, k=random_count)
+            )
+
+        return velocity_swaps
 
     def update_position(self):
         """Apply velocity (swap sequence) to current position"""
         for i, j in self.velocity:
             self.position[i], self.position[j] = self.position[j], self.position[i]
 
-SWAAPS = None
+
 class MTSPPSO:
-    def __init__(self, num_salesmen: int, distances: np.ndarray,
-                 num_particles: int = 50, max_iterations: int = 1000):
+    def __init__(self, num_salesmen, distances,
+                 num_particles=50, max_iterations=1000):
         self.num_cities = distances.shape[0]
         self.num_salesmen = num_salesmen
         self.distances = distances
@@ -207,13 +270,13 @@ class MTSPPSO:
         self.best_fitness_history = []
         self.gbest_particle = None
 
-    def optimize(self) -> tuple[Particle, float]:
-        w_start, w_end = 10, 5
-        c1_start, c1_end = 8, 4
-        c2_start, c2_end = 3, 4
+    def optimize(self):
+        w_start, w_end = 3, 1
+        c1_start, c1_end = 5, 2
+        c2_start, c2_end = 5, 2
         pbar = tqdm.trange(self.max_iterations)
         for iteration in pbar:
-            w  =  w_start - ( w_start -  w_end) * iteration / self.max_iterations
+            w = w_start - (w_start - w_end) * iteration / self.max_iterations
             c1 = c1_start - (c1_start - c1_end) * iteration / self.max_iterations
             c2 = c2_start - (c2_start - c2_end) * iteration / self.max_iterations
 
@@ -249,12 +312,13 @@ def plot_sol(best):
     plt.scatter(list(map(lambda x: x[0], COORDS)), list(map(lambda x: x[1], COORDS)))
     for i, tour in enumerate(best):
         color = colors[i % len(colors)]
-        plt.plot(list(map(lambda x: COORDS[x-1][0], tour)), list(map(lambda x: COORDS[x-1][1], tour)),
+        plt.plot(list(map(lambda x: COORDS[x - 1][0], tour)), list(map(lambda x: COORDS[x - 1][1], tour)),
                  color=color,
                  label=f'Salesman {i + 1}')
     plt.pause(0.05)
 
-def pso_mtsp(distances: str, num_salesmen: int, particles, iterations):
+
+def pso_mtsp(distances, num_salesmen, particles, iterations):
     pso = MTSPPSO(
         num_salesmen=num_salesmen,
         distances=distances,
@@ -284,13 +348,9 @@ def pso_mtsp(distances: str, num_salesmen: int, particles, iterations):
 
 
 if __name__ == "__main__":
-    ## git clone https://github.com/mastqe/tsplib
-    INSTANCE = 'eil51'
-    SALESMEN = 2
-    W1, W2 = 0.8, 0.2 # fitness coefs for total cost (1) and min max cost (2)
-    distance_matrix = create_distance_matrix(open(f"H3_GA/tsplib/{INSTANCE}.tsp",'rt').read())
-    pso_mtsp(distance_matrix, 
-        num_salesmen=SALESMEN, 
-        particles=1500, 
-        iterations=1500
-    )
+    distance_matrix = create_distance_matrix(open(r"D:\Facultate\tsplib\eil51.tsp", 'rt').read())
+    pso_mtsp(distance_matrix,
+             num_salesmen=2,
+             particles=500,
+             iterations=1000
+             )
