@@ -4,7 +4,10 @@ import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import tqdm
-
+import os
+import time
+import json
+from datetime import datetime
 
 def create_distance_matrix(tsp_content):
     global COORDS
@@ -113,8 +116,10 @@ class Particle:
         angles = [(c, (np.pi) + np.arctan2((depot_coords[0] - COORDS[c][0]), (depot_coords[1] - COORDS[c][1]))) for c in cities]
         angles.sort(key=lambda x: x[1])
         # Then divide the cities into n_salesmen groups
-        group_start_angle_delims = [x[1] for x in random.sample(angles, self.num_salesmen)]
+        aang = list(set(map(lambda x: x[1], angles)))
+        group_start_angle_delims = [x for x in random.sample(aang, self.num_salesmen)]
         group_start_angle_delims.sort()
+
         for s in range(self.num_salesmen-1):
             #V2: each group gets fixed degrees
             start_angle = group_start_angle_delims[s]
@@ -207,47 +212,59 @@ class Particle:
         return valid_swaps
 
     def update_velocity(self, global_best_position, w, c1, c2):
-
         self.velocity = []
-
         sigma = 2
 
+        # Get solution length (excluding depot visits)
+        solution_length = len(global_best_position)
+
+        # Scale the coefficients based on solution length
+        # Using square root to prevent too many swaps for very large problems
+        length_factor = np.sqrt(solution_length) / 4  # Divide by 4 to keep numbers reasonable
+
+        scaled_c1 = c1 * length_factor
+        scaled_c2 = c2 * length_factor
+        scaled_w = w * length_factor
+
+        # Get cognitive component swaps (toward personal best)
         cognitive_swaps = get_valid_swaps(self.position, self.personal_best_position)
         if cognitive_swaps:
             cognitive_count = max(0, min(
-                int(random.gauss(mu=c1, sigma=sigma)),
+                int(random.gauss(mu=scaled_c1, sigma=sigma)),
                 len(cognitive_swaps)
             ))
-            idxs = random.sample(range(len(cognitive_swaps)), k=cognitive_count)
-            idxs.sort()
-            self.velocity.extend(
-                [cognitive_swaps[idx] for idx in idxs]
-            )
+            if cognitive_count > 0:
+                idxs = random.sample(range(len(cognitive_swaps)), k=cognitive_count)
+                idxs.sort()
+                self.velocity.extend(
+                    [cognitive_swaps[idx] for idx in idxs]
+                )
 
-        # Next, add swaps that move us toward global best (social component)
+        # Get social component swaps (toward global best)
         social_swaps = get_valid_swaps(self.position, global_best_position)
         if social_swaps:
             social_count = max(0, min(
-                int(random.gauss(mu=c2, sigma=sigma)),
+                int(random.gauss(mu=scaled_c2, sigma=sigma)),
                 len(social_swaps)
             ))
-            idxs = random.sample(range(len(social_swaps)), k=social_count)
-            idxs.sort()
-            self.velocity.extend(
-                [social_swaps[idx] for idx in idxs]
-            )
+            if social_count > 0:
+                idxs = random.sample(range(len(social_swaps)), k=social_count)
+                idxs.sort()
+                self.velocity.extend(
+                    [social_swaps[idx] for idx in idxs]
+                )
 
-        # Finally, add random swaps for exploration (inertia component)
+        # Get random swaps for exploration
         random_swaps = self._get_random_valid_swaps()
         if random_swaps:
-            # The inertia weight w determines how many random swaps to include
             random_count = max(0, min(
-                int(random.gauss(mu=w, sigma=sigma)),
+                int(random.gauss(mu=scaled_w, sigma=sigma)),
                 len(random_swaps)
             ))
-            self.velocity.extend(
-                random.sample(random_swaps, k=random_count)
-            )
+            if random_count > 0:
+                self.velocity.extend(
+                    random.sample(random_swaps, k=random_count)
+                )
 
     def update_position(self):
         """Apply velocity (swap sequence) to current position"""
@@ -287,9 +304,9 @@ class MTSPPSO:
         self.best_fitness_history = []
 
     def optimize(self):
-        w_start, w_end = 3, 1
-        c1_start, c1_end = 5, 2
-        c2_start, c2_end = 10, 4
+        w_start, w_end = 4, 1
+        c1_start, c1_end = 5, 4
+        c2_start, c2_end = 6, 5
         pbar = tqdm.trange(self.max_iterations)
         besst = self.gbest_particle.calculate_fitness()
         fitnesses = [p.calculate_fitness()[0] for p in self.particles]
@@ -365,10 +382,122 @@ def pso_mtsp(distances, num_salesmen, particles, iterations):
     return best_solution, best_fitness, routes
 
 
+def run_batch_experiments(file_paths, salesmen_counts=[2, 3, 5, 7], num_trials=10,
+                          num_particles=1000, num_iterations=1000):
+    # Create results directory with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    base_output_dir = f"mtsp_results_{timestamp}"
+    os.makedirs(base_output_dir, exist_ok=True)
+
+    # Store overall results
+    all_results = {}
+
+    for file_path in file_paths:
+        problem_name = os.path.basename(file_path).split('.')[0]
+        problem_dir = os.path.join(base_output_dir, problem_name)
+        os.makedirs(problem_dir, exist_ok=True)
+
+        print(f"\nProcessing {problem_name}")
+        print("=" * 50)
+
+        # Read the TSP file content
+        with open(file_path, 'r') as f:
+            tsp_content = f.read()
+
+        distance_matrix = create_distance_matrix(tsp_content)
+        problem_results = {}
+
+        for num_salesmen in salesmen_counts:
+            print(f"\nRunning with {num_salesmen} salesmen")
+            print("-" * 30)
+
+            # Create directory for this salesmen configuration
+            salesmen_dir = os.path.join(problem_dir, f"salesmen_{num_salesmen}")
+            os.makedirs(salesmen_dir, exist_ok=True)
+
+            trials_results = []
+
+            for trial in range(num_trials):
+                print(f"Trial {trial + 1}/{num_trials}")
+
+                # Create trial directory
+                trial_dir = os.path.join(salesmen_dir, f"trial_{trial + 1}")
+                os.makedirs(trial_dir, exist_ok=True)
+
+                # Run PSO
+                start_time = time.time()
+                best_solution, best_fitness, routes = pso_mtsp(
+                    distance_matrix,
+                    num_salesmen=num_salesmen,
+                    particles=num_particles,
+                    iterations=num_iterations
+                )
+                end_time = time.time()
+
+                # Calculate route lengths
+                route_lengths = [best_solution.calculate_tour_cost(route) for route in routes]
+
+                # Save plot
+                plt.savefig(os.path.join(trial_dir, 'solution_plot.png'))
+                plt.close()
+
+                # Prepare trial results
+                trial_results = {
+                    "trial_number": trial + 1,
+                    "max_tour_length": best_fitness,
+                    "total_length": sum(route_lengths),
+                    "individual_tour_lengths": route_lengths,
+                    "routes": routes,
+                    "computation_time": end_time - start_time
+                }
+
+                # Save trial results to JSON
+                with open(os.path.join(trial_dir, 'results.json'), 'w') as f:
+                    json.dump(trial_results, f, indent=2)
+
+                trials_results.append(trial_results)
+
+            # Calculate and save summary statistics for this salesmen configuration
+            summary_stats = {
+                "num_salesmen": num_salesmen,
+                "num_trials": num_trials,
+                "best_max_length": min(r["max_tour_length"] for r in trials_results),
+                "average_max_length": sum(r["max_tour_length"] for r in trials_results) / num_trials,
+                "best_total_length": min(r["total_length"] for r in trials_results),
+                "average_total_length": sum(r["total_length"] for r in trials_results) / num_trials,
+                "average_computation_time": sum(r["computation_time"] for r in trials_results) / num_trials,
+                "best_trial": min(range(len(trials_results)),
+                                  key=lambda i: trials_results[i]["max_tour_length"]) + 1
+            }
+
+            # Save summary statistics for this salesmen configuration
+            with open(os.path.join(salesmen_dir, 'summary_stats.json'), 'w') as f:
+                json.dump(summary_stats, f, indent=2)
+
+            problem_results[f"salesmen_{num_salesmen}"] = summary_stats
+
+        # Save problem summary
+        with open(os.path.join(problem_dir, 'problem_summary.json'), 'w') as f:
+            json.dump(problem_results, f, indent=2)
+
+        all_results[problem_name] = problem_results
+
+    # Save overall results
+    with open(os.path.join(base_output_dir, 'all_results.json'), 'w') as f:
+        json.dump(all_results, f, indent=2)
+
+    return base_output_dir
+
+
 if __name__ == "__main__":
-    distance_matrix = create_distance_matrix(open(r"H3_GA\tsplib\eil51.tsp", 'rt').read())
-    pso_mtsp(distance_matrix,
-             num_salesmen=2,
-             particles=500,
-             iterations=1000
-             )
+    # Define the file paths
+    file_paths = [
+        r"D:\Facultate\tsplib\eil51.tsp",
+        r"D:\Facultate\tsplib\berlin52.tsp",
+        r"D:\Facultate\tsplib\eil76.tsp",
+        r"D:\Facultate\tsplib\rat99.tsp"
+    ]
+
+    # Run the experiments
+    output_dir = run_batch_experiments(file_paths)
+    print(f"\nAll results have been saved to: {output_dir}")
