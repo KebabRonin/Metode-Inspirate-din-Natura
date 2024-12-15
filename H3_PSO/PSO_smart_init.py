@@ -213,26 +213,27 @@ class Particle:
 
     def update_velocity(self, global_best_position, w, c1, c2):
         self.velocity = []
-        sigma = 2
+        sigma = 1
 
         # Get solution length (excluding depot visits)
         solution_length = len(global_best_position)
 
         # Scale the coefficients based on solution length
         # Using square root to prevent too many swaps for very large problems
-        length_factor = np.sqrt(solution_length) / 4  # Divide by 4 to keep numbers reasonable
+        # length_factor = np.sqrt(solution_length) / 4  # Divide by 4 to keep numbers reasonable
 
-        scaled_c1 = c1 * length_factor
-        scaled_c2 = c2 * length_factor
-        scaled_w = w * length_factor
+        cognitive_swaps = get_valid_swaps(self.position, self.personal_best_position)
+        social_swaps = get_valid_swaps(self.position, global_best_position)
+        random_swaps = self._get_random_valid_swaps()
+        scaled_c1 = c1 * len(cognitive_swaps)
+        scaled_c2 = c2 * len(social_swaps)
+        scaled_w = w * len(random_swaps)
 
         # Get cognitive component swaps (toward personal best)
-        cognitive_swaps = get_valid_swaps(self.position, self.personal_best_position)
         if cognitive_swaps:
-            cognitive_count = max(0, min(
-                int(random.gauss(mu=scaled_c1, sigma=sigma)),
-                len(cognitive_swaps)
-            ))
+            cognitive_count = np.clip(
+                int(random.gauss(mu=scaled_c1, sigma=sigma)), 0, len(cognitive_swaps)
+            )
             if cognitive_count > 0:
                 idxs = random.sample(range(len(cognitive_swaps)), k=cognitive_count)
                 idxs.sort()
@@ -241,12 +242,10 @@ class Particle:
                 )
 
         # Get social component swaps (toward global best)
-        social_swaps = get_valid_swaps(self.position, global_best_position)
         if social_swaps:
-            social_count = max(0, min(
-                int(random.gauss(mu=scaled_c2, sigma=sigma)),
-                len(social_swaps)
-            ))
+            social_count = np.clip(
+                int(random.gauss(mu=scaled_c2, sigma=sigma)), 0, len(social_swaps)
+            )
             if social_count > 0:
                 idxs = random.sample(range(len(social_swaps)), k=social_count)
                 idxs.sort()
@@ -255,16 +254,15 @@ class Particle:
                 )
 
         # Get random swaps for exploration
-        random_swaps = self._get_random_valid_swaps()
         if random_swaps:
-            random_count = max(0, min(
-                int(random.gauss(mu=scaled_w, sigma=sigma)),
-                len(random_swaps)
-            ))
+            random_count = np.clip(
+                int(random.gauss(mu=scaled_w, sigma=sigma)), 0, len(random_swaps)
+            )
             if random_count > 0:
                 self.velocity.extend(
                     random.sample(random_swaps, k=random_count)
                 )
+        return cognitive_count if cognitive_swaps else None, social_count if social_swaps else None, random_count if random_swaps else None
 
     def update_position(self):
         """Apply velocity (swap sequence) to current position"""
@@ -304,10 +302,10 @@ class MTSPPSO:
         self.best_fitness_history = []
 
     def optimize(self):
-        w_start, w_end = 4, 1
-        c1_start, c1_end = 5, 4
-        c2_start, c2_end = 6, 5
-        pbar = tqdm.trange(self.max_iterations)
+        w_start, w_end = 0.0005, 0.00015
+        c1_start, c1_end = 0.3, 0.15
+        c2_start, c2_end = 0.15, 0.5
+        pbar = tqdm.trange(self.max_iterations, file=None)
         besst = self.gbest_particle.calculate_fitness()
         fitnesses = [p.calculate_fitness()[0] for p in self.particles]
         pbar.set_postfix_str(f"Fit:{besst[0]:>10.5f}|Total:{besst[1]:>10.5f}|Max:{besst[2]:>10.5f}|Var:{np.var(fitnesses):>10.5f}")
@@ -335,7 +333,8 @@ class MTSPPSO:
             self.best_fitness_history.append(self.global_best_fitness)
 
             for particle in self.particles:
-                particle.update_velocity(self.global_best_position, w, c1, c2)
+                c1s, c2s, ws = particle.update_velocity(self.global_best_position, w, c1, c2)
+                pbar.set_description_str(f"c1 {f'{c1s}'.rjust(5)}, c2 {f'{c2s}'.rjust(5)}, w {f'{ws}'.rjust(5)}")
                 particle.update_position()
 
         return self.gbest_particle, self.global_best_fitness
@@ -377,7 +376,7 @@ def pso_mtsp(distances, num_salesmen, particles, iterations):
     print(f"[\n{output}]")
 
     plot_sol(routes)
-    plt.show()
+    # plt.show()
 
     return best_solution, best_fitness, routes
 
