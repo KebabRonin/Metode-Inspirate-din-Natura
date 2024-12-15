@@ -42,7 +42,6 @@ def create_distance_matrix(tsp_content):
 
 
 def get_valid_swaps(source, target):
-
     if len(source) != len(target) or sorted(source) != sorted(target):
         raise ValueError("Lists must be the same length and contain the same elements")
 
@@ -62,6 +61,7 @@ def get_valid_swaps(source, target):
     # Store the swap operations
     swaps = []
 
+    scopy = copy.deepcopy(source)
     # Process each position
     for start in range(n):
         # Skip if we've already handled this position or
@@ -79,7 +79,6 @@ def get_valid_swaps(source, target):
             current = target_positions[current]
 
         # Generate the swaps for this cycle
-        scopy = copy.deepcopy(source)
         for i in range(len(cycle) - 1):
             pos1 = cycle[i]
             pos2 = cycle[i + 1]
@@ -263,14 +262,6 @@ class Particle:
             if not (was_ok_move(i, self.position) and was_ok_move(j, self.position)):
                 self.position[i], self.position[j] = self.position[j], self.position[i]
 
-        # pass
-
-        # for i, j in self.velocity:
-        #     pp[i], pp[j] = pp[j], pp[i]
-        #     if not (was_ok_move(i, pp) and was_ok_move(j, pp)):
-        #         pp[i], pp[j] = pp[j], pp[i]
-
-        return
 
 class MTSPPSO:
     def __init__(self, num_salesmen, distances,

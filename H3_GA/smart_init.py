@@ -170,7 +170,8 @@ class MTSPIndividual:
         if len(self.chromosomes[s1]) <= 3:
             return
         cutoff = random.randint(1, len(self.chromosomes[s1][1:-1]))
-        self.chromosomes[s2].insert(-1, self.chromosomes[s1].pop(cutoff))
+        insertion_point = random.randint(1, len(self.chromosomes[s2][1:-1]))
+        self.chromosomes[s2].insert(insertion_point, self.chromosomes[s1].pop(cutoff))
         return
 
     def mutation(self, mutation_rate: float):
@@ -351,14 +352,14 @@ def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, soft_restart_count, 
 def save_stuff(result, instance, name):
     best, hist = result
     plot_sol(best)
-    plt.savefig(f"H3_GA/{instance}/{name}_plot.png")
+    plt.savefig(f"{SAVE_PATH}/{instance}/{name}_plot.png")
     fit, tot, mx = list(zip(*hist))
     plt.cla()
     plt.plot(fit, label=f'Fitness ({W1} avg, {W2} max)')
     plt.plot(tot, label=f'Total length')
     plt.plot(mx, label=f'Max salesman length')
     plt.legend()
-    plt.savefig(f"H3_GA/{instance}/{name}_hist.png")
+    plt.savefig(f"{SAVE_PATH}/{instance}/{name}_hist.png")
     json.dump({
         'best': best.chromosomes,
         'lens': list(map(lambda c: best.calculate_tour_cost(c), best.chromosomes)),
@@ -366,27 +367,45 @@ def save_stuff(result, instance, name):
         'total_cost': best.calculate_fitness()[1],
         'max_cost': best.calculate_fitness()[2],
         'hist': hist,
-        }, open(f"H3_GA/{instance}/{name}.json", 'wt'))
+    }, open(f"{SAVE_PATH}/{instance}/{name}.json", 'wt'))
 
+def save_config():
+    import shutil, sys
+    shutil.copy(__file__, f"{SAVE_PATH}/source.py")
+    json.dump({
+        'salesmen': SALESMEN,
+        'pop_size': POPSIZE,
+        'max_gens': MAX_GENERATIONS,
+        'soft_restart_count': SOFT_RESTARTS,
+        'mutation_rate': MUTATION_RATE,
+        'crossover_rate': CROSSOVER_RATE,
+        'W1': W1,
+        'W2': W2,
+        'T_SIZE': T_SIZE,
+        'INSULE': INSULE
+    }, open(f"{SAVE_PATH}/{instance}/{salesmen}/config.json", 'wt'))
 
 if __name__ == '__main__':
+    NAME = 'GA smart new cross mutation' # TODO: DON'T FORGET TO CHANGE THIS !!!!!
+    SAVE_PATH = f"H3_GA/runs/{NAME}"
     ## git clone https://github.com/mastqe/tsplib
-    INSTANCE = 'eil51'
+    TSPLIB_PATH = "H3_GA/tsplib"
     SALESMEN = 2
     W1, W2 = 0.8, 0.2 # fitness coefs for total cost (1) and min max cost (2)
     POPSIZE = 500
     T_SIZE = 10
-    MAX_GENERATIONS = 2500
+    MAX_GENERATIONS = 3500
     SOFT_RESTARTS = 10
     INSULE = 5
     MUTATION_RATE = 0.1
     CROSSOVER_RATE = 0.5
+    save_config()
     pbar = tqdm.tqdm(itertools.product(['eil51', 'berlin52', 'eil76', 'rat99'], [2, 3, 5, 7]), position=0, leave=False, total = 4*4)
     for instance, salesmen in pbar:
         pbar.set_description(f"{instance} {salesmen} salesmen")
-        if not os.path.exists(f"H3_GA/{instance}/{salesmen}/"):
-            os.makedirs(f"H3_GA/{instance}/{salesmen}/")
-        distance_matrix = create_distance_matrix(open(f'H3_GA/tsplib/{instance}.tsp', 'rt').read())
+        if not os.path.exists(f"{SAVE_PATH}/{instance}/{salesmen}/"):
+            os.makedirs(f"{SAVE_PATH}/{instance}/{salesmen}/")
+        distance_matrix = create_distance_matrix(open(f'{TSPLIB_PATH}/{instance}.tsp', 'rt').read())
         results = [None for _ in range(INSULE)]
         ts = [Thread(target=run_ag, args=(
             distance_matrix,
