@@ -115,18 +115,10 @@ class MTSPIndividual:
         return used_cities == expected_cities
 
     def calculate_fitness(self) -> float:
-        global W1, W2
-        """
-        w1: weight for total cost
-        w2: weight for maximum tour cost
-        """
         tour_costs = [self.calculate_tour_cost(tour) for tour in self.chromosomes]
         total_cost = sum(tour_costs)
         max_cost = max(tour_costs)
 
-        avg_cost = total_cost / len(self.chromosomes)
-
-        # Weighted sum of objectives
         fitness_score = max_cost
 
         return fitness_score, total_cost, max_cost
@@ -170,8 +162,10 @@ class MTSPIndividual:
         if len(self.chromosomes[s1]) <= 3:
             return
         cutoff = random.randint(1, len(self.chromosomes[s1][1:-1]))
-        insertion_point = random.randint(1, len(self.chromosomes[s2][1:-1]))
+        insertion_point = random.randint(1, len(self.chromosomes[s2])-1)
         self.chromosomes[s2].insert(insertion_point, self.chromosomes[s1].pop(cutoff))
+        if not self.is_valid():
+            raise Exception("asda")
         return
 
     def mutation(self, mutation_rate: float):
@@ -306,6 +300,7 @@ def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, soft_restart_count, 
     mrate = mutation_rate
     crate = crossover_rate
     best = copy.deepcopy(population.get_best_solution())
+    best_score = best.calculate_fitness()[0]
     # if draw_plot:
     #     plot_sol(best)
     liter = 0
@@ -320,10 +315,12 @@ def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, soft_restart_count, 
         #     raise Exception("Bad mutation")
         if population.get_best_solution().calculate_fitness()[0] < best.calculate_fitness()[0]:
             best = copy.deepcopy(population.get_best_solution())
+            best_score = best.calculate_fitness()[0]
             # if draw_plot:
             # plot_sol(best)
         hist.append(population.get_best_solution().calculate_fitness())
-        if t - liter > 50 and np.var(list(map(lambda x: x[0], hist[-50:]))) < 5:
+        es_list = list(map(lambda x: x[0], hist[-50:]))
+        if t - liter > 50 and np.mean(es_list[:25]) - np.mean(es_list[25:]) < 5:
             # print(mrate, crate)
             mrate = 0.9
             crate = 0.1
@@ -341,7 +338,7 @@ def run_ag(distance_matrix, n_salesmen, pop_size, max_gens, soft_restart_count, 
                 if crate > crossover_rate:
                     crate = crossover_rate
         besst = population.get_best_solution().calculate_fitness()
-        besst = f"Fit:{besst[0]:.5f}|Total:{besst[1]:.5f}|Max:{besst[2]:.5f}"
+        besst = f"Fit:{besst[0]:.4f}|Tot:{besst[1]:.4f}|Max:{besst[2]:.4f}|Bst:{best_score:.4f}"
         pbar.set_postfix_str(f"[{restarts}] Best solution: {besst}")
 
     if result:
@@ -355,7 +352,6 @@ def save_stuff(result, instance, name):
     plt.savefig(f"{SAVE_PATH}/{instance}/{name}_plot.png")
     fit, tot, mx = list(zip(*hist))
     plt.cla()
-    plt.plot(fit, label=f'Fitness ({W1} avg, {W2} max)')
     plt.plot(tot, label=f'Total length')
     plt.plot(mx, label=f'Max salesman length')
     plt.legend()
@@ -373,34 +369,31 @@ def save_config():
     import shutil, sys
     shutil.copy(__file__, f"{SAVE_PATH}/source.py")
     json.dump({
-        'salesmen': SALESMEN,
         'pop_size': POPSIZE,
         'max_gens': MAX_GENERATIONS,
         'soft_restart_count': SOFT_RESTARTS,
         'mutation_rate': MUTATION_RATE,
         'crossover_rate': CROSSOVER_RATE,
-        'W1': W1,
-        'W2': W2,
         'T_SIZE': T_SIZE,
         'INSULE': INSULE
-    }, open(f"{SAVE_PATH}/{instance}/{salesmen}/config.json", 'wt'))
+    }, open(f"{SAVE_PATH}/config.json", 'wt'))
 
 if __name__ == '__main__':
-    NAME = 'GA smart new cross mutation' # TODO: DON'T FORGET TO CHANGE THIS !!!!!
+    NAME = 'GA final' + time.strftime('%d-%m-%H %M %S') # TODO: DON'T FORGET TO CHANGE THIS !!!!!
     SAVE_PATH = f"H3_GA/runs/{NAME}"
     ## git clone https://github.com/mastqe/tsplib
     TSPLIB_PATH = "H3_GA/tsplib"
-    SALESMEN = 2
-    W1, W2 = 0.8, 0.2 # fitness coefs for total cost (1) and min max cost (2)
-    POPSIZE = 500
-    T_SIZE = 10
+    POPSIZE = 750
+    T_SIZE = 7
     MAX_GENERATIONS = 3500
-    SOFT_RESTARTS = 10
-    INSULE = 5
-    MUTATION_RATE = 0.1
+    SOFT_RESTARTS = 8
+    INSULE = 10
+    MUTATION_RATE = 0.15
     CROSSOVER_RATE = 0.5
+    if not os.path.exists(f"{SAVE_PATH}/"):
+        os.makedirs(f"{SAVE_PATH}/")
     save_config()
-    pbar = tqdm.tqdm(itertools.product(['eil51', 'berlin52', 'eil76', 'rat99'], [2, 3, 5, 7]), position=0, leave=False, total = 4*4)
+    pbar = tqdm.tqdm(itertools.product(['berlin52', 'eil76', 'rat99', 'eil51'], [2, 3, 5, 7]), position=0, leave=False, total = 4*4)
     for instance, salesmen in pbar:
         pbar.set_description(f"{instance} {salesmen} salesmen")
         if not os.path.exists(f"{SAVE_PATH}/{instance}/{salesmen}/"):
